@@ -18,6 +18,12 @@
   canvas{display:block;width:100%;height:auto;cursor:crosshair}
   .overlay{position:absolute;inset:0;background:#07101bd9;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px}
   .panel{max-width:500px;max-height:calc(100vh - 40px);overflow-y:auto;background:#101d30f2;border:1px solid #345578;border-radius:16px;padding:28px;box-shadow:0 10px 40px #0008}
+  .cover-art{position:relative;height:clamp(130px,22vh,180px);margin:-18px -18px 18px;overflow:hidden;border-radius:12px 12px 6px 6px;background:#252b2a;text-align:left}
+  .cover-art img{display:block;width:100%;height:100%;object-fit:cover;object-position:center 43%;filter:sepia(.32) saturate(.82) brightness(.78)}
+  .cover-art:after{content:'';position:absolute;inset:0;background:linear-gradient(0deg,#080d16d9,transparent 72%)}
+  .cover-art strong,.cover-art small{position:absolute;z-index:1;left:14px;text-shadow:0 2px 5px #000}
+  .cover-art strong{bottom:22px;color:#fff;font-size:13px}
+  .cover-art small{right:12px;bottom:7px;left:auto;color:#d0d5d4;font-size:9px}
   h1{margin:0 0 8px;font-size:clamp(28px,5vw,44px);letter-spacing:2px} h1 em{font-style:normal;color:#42b4ff}
   .panel p{color:#b7c8de;line-height:1.6}
   button{border:0;border-radius:8px;padding:13px 24px;background:linear-gradient(135deg,#169bff,#3568ff);color:white;font-size:15px;font-weight:800;letter-spacing:1px;cursor:pointer}
@@ -43,6 +49,11 @@
     <canvas id="game" width="1400" height="840" aria-label="Jogo NEXUS Arena"></canvas>
     <div class="overlay" id="overlay">
       <div class="panel">
+        <figure class="cover-art">
+          <img src="assets/normandy-cover.jpg" alt="Soldados desembarcando na praia da Normandia durante o Dia D, em 1944">
+          <strong>OMAHA BEACH · 06.06.1944</strong>
+          <small>Foto histórica: U.S. Army · domínio público</small>
+        </figure>
         <div class="tag">OPERAÇÃO 01 // SETOR B</div>
         <h1>NEXUS <em>ARENA</em></h1>
         <p>Entra na arena, enfrenta soldados inimigos e tenta sobreviver. FPS militar 2D em visão superior.</p>
