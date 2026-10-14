@@ -75,7 +75,7 @@ const MAG_SIZE=45,MAX_RESERVE=240;
 let keys={},mouse={x:W/2,y:H/2,down:false},player,bots,bullets,particles,kills,ammo,reserve,reloadTimer,gameOver,running,last=0,spawnTimer,airCharge,planes,bombs,airstrikeFlash,raidTimer;
 let gameMode='arena',campaignTarget=8,campaignStage=1;
 const campaignStages=[
- {name:'NORMANDY BEACH',target:8,enemySpeed:1,theme:'beach',palette:{ground:'#6b6249',grid:'#22313d',wall:'#887653',accent:'#d6b261',hud:'#8ae0ff'}},
+ {name:'NORMANDY BEACH',target:8,enemySpeed:1,theme:'beach',palette:{ground:'#6b6249',grid:'#22313d',wall:'#74776c',accent:'#d6b261',hud:'#8ae0ff'}},
  {name:'TRINCHEIRAS DO OESTE',target:10,enemySpeed:1.08,theme:'trench',palette:{ground:'#63583f',grid:'#292d2f',wall:'#87714f',accent:'#d6b05d',hud:'#9be6ff'}},
  {name:'VILA EM RUÍNAS',target:12,enemySpeed:1.16,theme:'ruins',palette:{ground:'#62594c',grid:'#312a29',wall:'#85745a',accent:'#d89056',hud:'#9be6ff'}},
  {name:'FLORESTA SOMBRIA',target:14,enemySpeed:1.24,theme:'forest',palette:{ground:'#45513b',grid:'#1f322b',wall:'#66724f',accent:'#d7c76d',hud:'#9be6ff'}},
@@ -339,6 +339,23 @@ function draw(){
    ctx.fillStyle=stage.theme==='forest'?'#263d29':'#35432d';ctx.beginPath();ctx.arc(px,py,radius,0,Math.PI*2);ctx.fill();
    ctx.fillStyle=stage.theme==='beach'?'#68744a':'#4e6037';ctx.beginPath();ctx.arc(px-4,py-4,radius*.58,0,Math.PI*2);ctx.fill();
  }
+ if(stage.theme==='beach'){
+   // Duna costeira ao fundo, com vegetação baixa na linha do horizonte.
+   ctx.fillStyle='#52613f';ctx.beginPath();ctx.moveTo(25,115);ctx.quadraticCurveTo(250,78,465,108);ctx.quadraticCurveTo(690,135,885,92);ctx.quadraticCurveTo(1110,58,1375,106);ctx.lineTo(1375,28);ctx.lineTo(25,28);ctx.closePath();ctx.fill();
+   ctx.fillStyle='#7a8050';
+   for(let i=0;i<34;i++){
+     const gx=38+(i*41)%(W-76),gy=54+(i*23)%52;
+     ctx.beginPath();ctx.ellipse(gx,gy,8+(i%3)*3,3+(i%2)*2,(i%5)*.2,0,Math.PI*2);ctx.fill();
+   }
+   // Obstáculos antitanque de aço cruzado.
+   for(const [hx,hy,rotation] of [[720,180,-.35],[940,240,.55],[1100,450,-.2],[450,370,.4]]){
+     ctx.save();ctx.translate(hx,hy);ctx.rotate(rotation);
+     ctx.fillStyle='#34352e';ctx.beginPath();ctx.ellipse(0,7,25,8,0,0,Math.PI*2);ctx.fill();
+     ctx.lineCap='round';ctx.strokeStyle='#292c29';ctx.lineWidth=10;
+     ctx.beginPath();ctx.moveTo(-21,-14);ctx.lineTo(21,14);ctx.moveTo(-21,14);ctx.lineTo(21,-14);ctx.moveTo(0,-22);ctx.lineTo(0,22);ctx.stroke();
+     ctx.strokeStyle='#74766b';ctx.lineWidth=3;ctx.stroke();ctx.lineCap='butt';ctx.restore();
+   }
+ }
  // Trincheiras de terra com bordas reforçadas.
  const drawTrench=()=>{ctx.beginPath();ctx.moveTo(70,470);ctx.lineTo(300,470);ctx.lineTo(300,500);ctx.lineTo(480,500);ctx.moveTo(900,300);ctx.lineTo(1110,300);ctx.lineTo(1110,330);ctx.lineTo(1320,330)};
  drawTrench();ctx.strokeStyle='#342f25';ctx.lineWidth=32;ctx.stroke();
@@ -359,11 +376,18 @@ function draw(){
    ctx.fillStyle='#302d24';ctx.fillRect(a.x+4,a.y+5,a.w,a.h);
    ctx.fillStyle=stage.palette.wall;ctx.fillRect(a.x,a.y,a.w,a.h);
    ctx.strokeStyle='#443f31';ctx.lineWidth=3;ctx.strokeRect(a.x,a.y,a.w,a.h);
-   ctx.fillStyle=stage.theme==='city'||stage.theme==='ruins'?'#a69a7a':'#b1a077';
-   if(a.w>=a.h){
-     for(let sx=a.x+9;sx<a.x+a.w-5;sx+=19){ctx.beginPath();ctx.ellipse(sx,a.y+6,9,5,0,0,Math.PI*2);ctx.fill();}
+   if(stage.theme==='beach'){
+     ctx.strokeStyle='#55584f';ctx.lineWidth=2;
+     for(let sy=a.y+18;sy<a.y+a.h;sy+=22){ctx.beginPath();ctx.moveTo(a.x+2,sy);ctx.lineTo(a.x+a.w-2,sy);ctx.stroke();}
+     for(let sx=a.x+18;sx<a.x+a.w;sx+=36){ctx.beginPath();ctx.moveTo(sx,a.y+2);ctx.lineTo(sx,a.y+a.h-2);ctx.stroke();}
+     ctx.fillStyle='#4c4e48';ctx.fillRect(a.x+3,a.y+3,Math.max(8,a.w*.22),3);
    }else{
-     for(let sy=a.y+9;sy<a.y+a.h-5;sy+=19){ctx.beginPath();ctx.ellipse(a.x+6,sy,5,9,0,0,Math.PI*2);ctx.fill();}
+     ctx.fillStyle=stage.theme==='city'||stage.theme==='ruins'?'#a69a7a':'#b1a077';
+     if(a.w>=a.h){
+       for(let sx=a.x+9;sx<a.x+a.w-5;sx+=19){ctx.beginPath();ctx.ellipse(sx,a.y+6,9,5,0,0,Math.PI*2);ctx.fill();}
+     }else{
+       for(let sy=a.y+9;sy<a.y+a.h-5;sy+=19){ctx.beginPath();ctx.ellipse(a.x+6,sy,5,9,0,0,Math.PI*2);ctx.fill();}
+     }
    }
    ctx.fillStyle=stage.palette.accent;ctx.fillRect(a.x+8,a.y+a.h-7,Math.max(18,a.w*.32),3);
  }
@@ -380,10 +404,14 @@ function draw(){
    ctx.strokeStyle='#d6c17d';ctx.lineWidth=1;ctx.strokeRect(nearbyCrate.x-58,nearbyCrate.y-38,116,22);
    ctx.fillStyle='#fff0bd';ctx.font='bold 12px Arial';ctx.textAlign='center';ctx.fillText('F  ABRIR CAIXA',nearbyCrate.x,nearbyCrate.y-23);ctx.textAlign='left';
  }
- // crates
- for(const [x,y] of [[90,115],[1270,115],[320,700],[920,700],[650,155],[800,250],[470,580],[1120,470],[600,750],[1240,740]]){
-   ctx.fillStyle='#3a4e63';ctx.fillRect(x,y,38,38);ctx.strokeStyle='#71859a';ctx.strokeRect(x,y,38,38);
-   ctx.beginPath();ctx.moveTo(x+4,y+4);ctx.lineTo(x+34,y+34);ctx.moveTo(x+34,y+4);ctx.lineTo(x+4,y+34);ctx.stroke();
+ // Caixas de suprimentos de madeira espalhadas e empilhadas na praia.
+ const supplyCrates=[[90,115],[1270,115],[320,700],[920,700],[650,155],[800,250],[470,580],[1120,470],[600,750],[1240,740]];
+ if(stage.theme==='beach')supplyCrates.push([680,185],[716,185],[698,218]);
+ for(const [x,y] of supplyCrates){
+   ctx.fillStyle='#30271d';ctx.fillRect(x+3,y+4,36,32);
+   ctx.fillStyle='#765536';ctx.fillRect(x,y,36,32);ctx.strokeStyle='#352a1c';ctx.lineWidth=2;ctx.strokeRect(x,y,36,32);
+   ctx.strokeStyle='#b08a55';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x+4,y+4);ctx.lineTo(x+32,y+28);ctx.moveTo(x+32,y+4);ctx.lineTo(x+4,y+28);ctx.stroke();
+   ctx.fillStyle='#433321';ctx.fillRect(x+16,y,4,32);
  }
  // Aviões e bombas do ataque aéreo
  for(const pl of planes){
