@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NEXUS FPS — Arena 2D</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#080d16;color:#eef5ff;font-family:Arial,Helvetica,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center}
+  .shell{width:min(1100px,100%);padding:16px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+  .brand{font-weight:900;letter-spacing:3px;font-size:clamp(22px,4vw,34px)} .brand span{color:#38a8ff}
+  .tag{font-size:12px;color:#91a9c8;letter-spacing:2px}
+  .hud{display:flex;gap:8px;flex-wrap:wrap}
+  .stat{background:#111c2d;border:1px solid #263954;padding:9px 13px;border-radius:8px;font-size:13px;color:#b7cbe5}
+  .stat b{color:#fff;font-size:17px;margin-left:6px}
+  .gamebox{position:relative;border:1px solid #28415e;border-radius:12px;overflow:hidden;box-shadow:0 18px 60px #0009;background:#101b2a}
+  canvas{display:block;width:100%;height:auto;cursor:crosshair}
+  .overlay{position:absolute;inset:0;background:#07101bd9;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px}
+  .panel{max-width:500px;background:#101d30f2;border:1px solid #345578;border-radius:16px;padding:28px;box-shadow:0 10px 40px #0008}
+  h1{margin:0 0 8px;font-size:clamp(28px,5vw,44px);letter-spacing:2px} h1 em{font-style:normal;color:#42b4ff}
+  .panel p{color:#b7c8de;line-height:1.6}
+  button{border:0;border-radius:8px;padding:13px 24px;background:linear-gradient(135deg,#169bff,#3568ff);color:white;font-size:15px;font-weight:800;letter-spacing:1px;cursor:pointer}
+  button:hover{filter:brightness(1.13)}\n  input:focus{outline:1px solid #42b4ff}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;color:#91a9c8;font-size:12px}
+  .controls span{background:#111c2d;border:1px solid #263954;border-radius:7px;padding:8px 10px}
+  .bottom{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px;color:#7e96b5;font-size:12px}
+  .red{color:#ff626c}.blue{color:#4cbaff}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div><div class="brand">NEXUS<span> //</span> ARENA</div><div class="tag">2D TOP-DOWN WARFARE • MULTIPLAYER + CAMPANHA</div></div>
+    <div class="hud">
+      <div class="stat">ELIMINAÇÕES <b id="kills">0</b></div>
+      <div class="stat">VIDA <b id="health">100</b></div>
+      <div class="stat">MUNIÇÃO <b id="ammo">30 / 90</b></div>
+    </div>
+  </header>
+  <div class="gamebox">
+    <canvas id="game" width="1000" height="600" aria-label="Jogo NEXUS Arena"></canvas>
+    <div class="overlay" id="overlay">
+      <div class="panel">
+        <div class="tag">OPERAÇÃO 01 // SETOR B</div>
+        <h1>NEXUS <em>ARENA</em></h1>
+        <p>Entra na arena, elimina os bots vermelhos e tenta sobreviver. Este é o primeiro protótipo jogável do nosso FPS 2D.</p>
+        <p><b>WASD</b> mover · <b>Mouse</b> mirar · <b>Botão esquerdo</b> atirar · <b>R</b> recarregar</p>
+        <div id="networkBox" style="margin:16px 0;padding:12px;background:#091421;border:1px solid #2b4563;border-radius:10px;text-align:left">
+          <div style="font-weight:800;color:#dbeeff;margin-bottom:8px">MULTIPLAYER ONLINE (BETA)</div>
+          <button id="hostRoom" style="padding:10px 12px;font-size:12px;margin:0 4px 8px 0">CRIAR SALA</button>
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <input id="roomCode" placeholder="Código da sala do amigo" maxlength="80" style="min-width:0;flex:1;background:#0d1b2c;color:white;border:1px solid #345578;border-radius:7px;padding:10px">
+            <button id="joinRoom" style="padding:10px 12px;font-size:12px">ENTRAR</button>
+          </div>
+          <div id="netStatus" style="font-size:12px;color:#9db7d5;line-height:1.5">Crie uma sala ou entre com o código de um amigo.</div>
+          <div id="roomShare" style="display:none;margin-top:8px;color:#75d0ff;font-size:13px;word-break:break-all"></div>
+        </div>
+        <button id="start">INICIAR PARTIDA</button> <button id="campaignBtn" style="margin-top:8px;background:linear-gradient(135deg,#8a5b22,#c58a31)">JOGAR CAMPANHA OFFLINE</button>
+      </div>
+    </div>
+  </div>
+  <div class="controls"><span>W A S D — mover</span><span>MOUSE — mirar</span><span>CLIQUE — atirar</span><span>R — recarregar</span><span>E — ataque aéreo (barra cheia)</span><span>ENTER — reiniciar após derrota</span></div>
+  <div class="bottom"><span>VERSÃO 0.3 • Multiplayer beta + campanha offline</span><span>Projeto original de demonstração — <span class="blue">NEXUS</span></span></div>
+</div>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+(() => {
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+const overlay=document.getElementById('overlay'),startBtn=document.getElementById('start');
+const ui={kills:document.getElementById('kills'),health:document.getElementById('health'),ammo:document.getElementById('ammo')};
+const W=canvas.width,H=canvas.height;
+let keys={},mouse={x:W/2,y:H/2,down:false},player,bots,bullets,particles,kills,ammo,reserve,reloadTimer,gameOver,running,last=0,spawnTimer,airCharge,planes,bombs,airstrikeFlash;\nlet gameMode='arena',campaignTarget=8;
+const net={peer:null,conn:null,connections:[],remote:{},lastSend:0,localId:null};
+const netStatus=document.getElementById('netStatus'),roomShare=document.getElementById('roomShare');
+function statusNet(s){netStatus.textContent=s}
+function sendNet(data){
+ const packet={...data,from:net.localId};
+ if(net.conn&&net.conn.open)net.conn.send(packet);
+ for(const c of net.connections)if(c.open)c.send(packet);
+}
+function receiveNet(data){
+ if(!data||data.from===net.localId)return;
+ if(data.type==='state')net.remote[data.from]={x:data.x,y:data.y,angle:data.angle,hp:data.hp,at:Date.now()};
+ if(data.type==='shot')bullets.push({x:data.x,y:data.y,vx:Math.cos(data.angle)*620,vy:Math.sin(data.angle)*620,life:.7,team:'remote',damage:0});
+ if(data.type==='airstrike')planes.push({x:-90,y:data.y,vx:390,vy:35,targetX:data.x,targetY:data.ty,drop:.2,drops:8});
+}
+function setupConnection(c){
+ c.on('open',()=>{statusNet('Conectado! Os jogadores já podem entrar na arena.');c.send({type:'hello',from:net.localId});});
+ c.on('data',receiveNet);
+ c.on('close',()=>statusNet('A conexão com o outro jogador foi encerrada.'));
+ c.on('error',()=>statusNet('Falha na conexão. Confira o código e tente novamente.'));
+}
+function createRoom(){
+ if(!window.Peer){statusNet('A conexão online não carregou. Confira a internet e recarregue a página.');return;}
+ statusNet('Criando sala online…');roomShare.style.display='none';
+ try{
+  net.peer=new Peer();
+  net.peer.on('open',id=>{
+   net.localId=id;
+   roomShare.style.display='block';
+   roomShare.textContent='CÓDIGO DA SALA: '+id+' — envie este código ao amigo.';
+   statusNet('Sala criada! Aguarde seu amigo conectar.');
+  });
+  net.peer.on('connection',c=>{net.connections.push(c);setupConnection(c);});
+  net.peer.on('error',e=>statusNet('Erro de conexão: '+(e.type||'tente novamente')+'.'));
+ }catch(e){statusNet('Não foi possível criar a sala.')}
+}
+function joinRoom(){
+ const id=document.getElementById('roomCode').value.trim();
+ if(!id){statusNet('Digite o código da sala do seu amigo.');return}
+ if(!window.Peer){statusNet('A conexão online não carregou. Confira a internet e recarregue a página.');return;}
+ statusNet('Conectando à sala…');
+ try{
+  net.peer=new Peer();
+  net.peer.on('open',myId=>{net.localId=myId;net.conn=net.peer.connect(id,{reliable:true});setupConnection(net.conn);});
+  net.peer.on('error',e=>statusNet('Não foi possível conectar: '+(e.type||'verifique o código')+'.'));
+ }catch(e){statusNet('Não foi possível entrar na sala.')}
+}
+document.getElementById('hostRoom').addEventListener('click',createRoom);
+document.getElementById('joinRoom').addEventListener('click',joinRoom);
+
+const walls=[
+{x:180,y:100,w:150,h:42},{x:180,y:142,w:42,h:110},{x:670,y:90,w:150,h:42},{x:778,y:132,w:42,h:110},
+{x:390,y:95,w:70,h:125},{x:520,y:380,w:75,h:125},{x:155,y:390,w:140,h:42},{x:700,y:390,w:145,h:42},
+{x:390,y:270,w:75,h:48},{x:535,y:250,w:75,h:48},{x:75,y:250,w:70,h:70},{x:850,y:245,w:70,h:70}
+];
+function reset(){
+ player={x:500,y:520,r:14,angle:-Math.PI/2,hp:100,inv:0};
+ bots=[];bullets=[];particles=[];kills=0;ammo=30;reserve=90;reloadTimer=0;gameOver=false;spawnTimer=0;airCharge=0;planes=[];bombs=[];airstrikeFlash=0;
+ for(let i=0;i<5;i++)spawnBot(true);updateUI();
+}
+function spawnBot(initial=false){
+ let p,tries=0;
+ do {p={x:60+Math.random()*880,y:60+Math.random()*470};tries++}
+ while(tries<80&&(blocked(p.x,p.y,20)||Math.hypot(p.x-player.x,p.y-player.y)<180));
+ bots.push({x:p.x,y:p.y,r:13,hp:2,angle:Math.PI/2,speed:initial?45:50+Math.random()*18,shoot:0.7+Math.random()*1.2,flash:0});
+}
+function blocked(x,y,r){return walls.some(a=>x+r>a.x&&x-r<a.x+a.w&&y+r>a.y&&y-r<a.y+a.h)||x<r+20||x>W-r-20||y<r+20||y>H-r-20}
+function moveEntity(e,dx,dy){
+ if(!blocked(e.x+dx,e.y,e.r))e.x+=dx;
+ if(!blocked(e.x,e.y+dy,e.r))e.y+=dy;
+}
+function shoot(x,y,angle,team){
+ const speed=team==='blue'?620:300;
+ bullets.push({x:x+Math.cos(angle)*17,y:y+Math.sin(angle)*17,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,life:team==='blue'?1.1:1.7,team,damage:team==='blue'?1:8});
+}
+function burst(x,y,color,n=7){for(let i=0;i<n;i++){let a=Math.random()*Math.PI*2,s=25+Math.random()*120;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.2+Math.random()*.35,color})}}
+function update(dt){
+ if(!running||gameOver)return;
+ if(reloadTimer>0){reloadTimer-=dt;if(reloadTimer<=0){let need=30-ammo,take=Math.min(need,reserve);ammo+=take;reserve-=take}}
+ player.inv=Math.max(0,player.inv-dt);
+ let dx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0),dy=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0);
+ if(dx||dy){let l=Math.hypot(dx,dy);moveEntity(player,dx/l*220*dt,dy/l*220*dt)}
+ player.angle=Math.atan2(mouse.y-player.y,mouse.x-player.x);
+ if(mouse.down&&ammo>0&&reloadTimer<=0){if(!player.cool||player.cool<=0){shoot(player.x,player.y,player.angle,'blue');sendNet({type:'shot',x:player.x,y:player.y,angle:player.angle});ammo--;player.cool=.13;burst(player.x+Math.cos(player.angle)*19,player.y+Math.sin(player.angle)*19,'#ffd27a',2);updateUI()}}
+ player.cool=Math.max(0,(player.cool||0)-dt);
+ // Habilidade aérea: a barra carrega com o tempo; aperta E quando estiver cheia.
+ airCharge=Math.min(100,airCharge+dt*4.5);
+ airstrikeFlash=Math.max(0,airstrikeFlash-dt);
+ // Aviões cruzam a arena e soltam bombas na área marcada.
+ for(let i=planes.length-1;i>=0;i--){
+   const pl=planes[i];pl.x+=pl.vx*dt;pl.y+=pl.vy*dt;pl.drop-=dt;
+   if(pl.drop<=0&&pl.drops>0){
+     bombs.push({x:pl.x,y:pl.y+12,targetX:pl.targetX+(Math.random()-.5)*95,targetY:pl.targetY+(Math.random()-.5)*65,vy:180,life:2.4});
+     pl.drops--;pl.drop=.22;
+   }
+   if(pl.x<-100||pl.x>W+100||pl.y<-100||pl.y>H+100)planes.splice(i,1);
+ }
+ for(let i=bombs.length-1;i>=0;i--){
+   const bm=bombs[i];bm.y+=bm.vy*dt;bm.life-=dt;
+   if(bm.life<=0||Math.hypot(bm.x-bm.targetX,bm.y-bm.targetY)<12){
+     burst(bm.targetX,bm.targetY,'#ffb347',22);burst(bm.targetX,bm.targetY,'#d8d1b8',16);
+     // Explosão danifica bots próximos e pode atingir o jogador.
+     for(let j=bots.length-1;j>=0;j--){const b=bots[j];if(Math.hypot(b.x-bm.targetX,b.y-bm.targetY)<78){bots.splice(j,1);kills++;spawnTimer=.7;}}
+     if(Math.hypot(player.x-bm.targetX,player.y-bm.targetY)<62&&player.inv<=0){player.hp-=22;player.inv=.5;if(player.hp<=0){player.hp=0;gameOver=true;showEnd()}}
+     airstrikeFlash=.22;bombs.splice(i,1);updateUI();
+   }
+ }
+ // Tecla E chama apoio aéreo quando a barra chega a 100%.
+ if(keys.e&&airCharge>=100&&!gameOver){
+   airCharge=0;const tx=player.x+(Math.random()-.5)*250,ty=player.y+(Math.random()-.5)*180;
+   planes.push({x:-90,y:45+Math.random()*110,vx:390,vy:35,targetX:tx,targetY:ty,drop:.2,drops:8});sendNet({type:'airstrike',x:tx,y:45+Math.random()*110,ty:ty});
+   keys.e=false;
+ }
+ for(const b of bots){
+   b.flash=Math.max(0,b.flash-dt);
+   const dist=Math.hypot(player.x-b.x,player.y-b.y),ang=Math.atan2(player.y-b.y,player.x-b.x);b.angle=ang;
+   let vx=0,vy=0;
+   if(dist>190){vx=Math.cos(ang)*b.speed*dt;vy=Math.sin(ang)*b.speed*dt}
+   else if(dist<125){vx=-Math.cos(ang)*b.speed*.65*dt;vy=-Math.sin(ang)*b.speed*.65*dt}
+   moveEntity(b,vx,vy);
+   b.shoot-=dt;
+   if(b.shoot<=0&&dist<460){shoot(b.x,b.y,ang,'red');b.shoot=1.1+Math.random()*1.1}
+ }
+ for(let i=bullets.length-1;i>=0;i--){
+   const q=bullets[i];q.x+=q.vx*dt;q.y+=q.vy*dt;q.life-=dt;
+   let hit=q.life<=0||q.x<0||q.x>W||q.y<0||q.y>H||walls.some(a=>q.x>a.x&&q.x<a.x+a.w&&q.y>a.y&&q.y<a.y+a.h);
+   if(!hit&&q.team==='blue'){
+     for(let j=bots.length-1;j>=0;j--){let b=bots[j];if(Math.hypot(q.x-b.x,q.y-b.y)<b.r+3){b.hp--;b.flash=.1;burst(q.x,q.y,'#ff626c',4);hit=true;if(b.hp<=0){burst(b.x,b.y,'#ff4c5e',12);bots.splice(j,1);kills++;spawnTimer=1.1;updateUI();if(gameMode==='campaign'&&kills>=campaignTarget){gameOver=true;showVictory()}}break}}
+   }else if(!hit&&q.team==='red'&&Math.hypot(q.x-player.x,q.y-player.y)<player.r+3){
+     hit=true;if(player.inv<=0){player.hp-=q.damage;player.inv=.35;burst(player.x,player.y,'#ff626c',4);updateUI();if(player.hp<=0){player.hp=0;gameOver=true;showEnd()}}
+   }
+   if(hit)bullets.splice(i,1);
+ }
+ if(spawnTimer>0){spawnTimer-=dt;if(spawnTimer<=0&&bots.length<6)spawnBot()}
+ for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;if(p.life<=0)particles.splice(i,1)}
+ updateUI();
+}
+function updateUI(){ui.kills.textContent=kills;ui.health.textContent=Math.max(0,Math.ceil(player?.hp||100));ui.ammo.textContent=`${ammo} / ${reserve}`}
+function draw(){
+ ctx.clearRect(0,0,W,H);
+ ctx.fillStyle='#101b28';ctx.fillRect(0,0,W,H);
+ // floor grid
+ ctx.strokeStyle='#1d2c3e';ctx.lineWidth=1;
+ for(let x=20;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,20);ctx.lineTo(x,H-20);ctx.stroke()}
+ for(let y=20;y<H;y+=40){ctx.beginPath();ctx.moveTo(20,y);ctx.lineTo(W-20,y);ctx.stroke()}
+ // outer boundary
+ ctx.strokeStyle='#45617c';ctx.lineWidth=5;ctx.strokeRect(20,20,W-40,H-40);
+ // floor markings
+ ctx.strokeStyle='#dba83d';ctx.lineWidth=3;ctx.setLineDash([10,8]);
+ ctx.strokeRect(350,225,300,150);ctx.setLineDash([]);
+ ctx.fillStyle='#25384d';ctx.font='bold 20px Arial';ctx.fillText('SECTOR B',45,60);ctx.fillText('NEXUS // ARENA',W-235,58);\n if(gameMode==='campaign'){ctx.fillStyle='#f2d08b';ctx.font='bold 14px Arial';ctx.fillText('MISSÃO: ELIMINE '+campaignTarget+' INIMIGOS  ('+kills+'/'+campaignTarget+')',340,48);}
+ // cover and walls
+ for(const a of walls){
+   ctx.fillStyle='#26394e';ctx.fillRect(a.x,a.y,a.w,a.h);
+   ctx.fillStyle='#3a526c';ctx.fillRect(a.x,a.y,a.w,7);
+   ctx.strokeStyle='#101a27';ctx.lineWidth=3;ctx.strokeRect(a.x,a.y,a.w,a.h);
+   ctx.fillStyle='#d9a63c';ctx.fillRect(a.x+8,a.y+a.h-7,Math.max(18,a.w*.32),4);
+ }
+ // crates
+ for(const [x,y] of [[90,115],[870,115],[320,465],[635,480],[470,155],[600,150]]){
+   ctx.fillStyle='#3a4e63';ctx.fillRect(x,y,38,38);ctx.strokeStyle='#71859a';ctx.strokeRect(x,y,38,38);
+   ctx.beginPath();ctx.moveTo(x+4,y+4);ctx.lineTo(x+34,y+34);ctx.moveTo(x+34,y+4);ctx.lineTo(x+4,y+34);ctx.stroke();
+ }
+ // Aviões e bombas do ataque aéreo
+ for(const pl of planes){
+   ctx.save();ctx.translate(pl.x,pl.y);ctx.rotate(Math.atan2(pl.vy,pl.vx));
+   ctx.fillStyle='#252c31';ctx.beginPath();ctx.moveTo(-22,0);ctx.lineTo(-5,-6);ctx.lineTo(8,-20);ctx.lineTo(12,-20);ctx.lineTo(8,-4);ctx.lineTo(25,0);ctx.lineTo(8,4);ctx.lineTo(12,20);ctx.lineTo(8,20);ctx.lineTo(-5,6);ctx.closePath();ctx.fill();
+   ctx.fillStyle='#9ba4a8';ctx.fillRect(-7,-3,19,6);ctx.restore();
+ }
+ for(const bm of bombs){
+   ctx.fillStyle='#1c2228';ctx.beginPath();ctx.ellipse(bm.x,bm.y,5,9,0,0,Math.PI*2);ctx.fill();
+   ctx.fillStyle='#ffbd4a';ctx.fillRect(bm.x-2,bm.y-10,4,3);
+ }
+ if(airstrikeFlash>0){ctx.fillStyle=`rgba(255,170,65,${airstrikeFlash*1.5})`;ctx.fillRect(0,0,W,H)}
+ // bullets and particles
+ for(const q of bullets){ctx.fillStyle=q.team==='blue'?'#7cddff':'#ff6b72';ctx.beginPath();ctx.arc(q.x,q.y,4,0,Math.PI*2);ctx.fill()}
+ for(const p of particles){ctx.globalAlpha=Math.max(0,p.life*2);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,4,4);ctx.globalAlpha=1}
+ // bots
+ for(const b of bots)drawCharacter(b,'red');
+ drawCharacter(player,'blue',true);
+ // minimap
+ ctx.fillStyle='#08111ddc';ctx.fillRect(W-150,75,112,86);ctx.strokeStyle='#526d88';ctx.strokeRect(W-150,75,112,86);
+ for(const a of walls){ctx.fillStyle='#60748a';ctx.fillRect(W-145+a.x/W*102,80+a.y/H*76,Math.max(2,a.w/W*102),Math.max(2,a.h/H*76))}
+ for(const b of bots){ctx.fillStyle='#ff5a67';ctx.fillRect(W-145+b.x/W*102-2,80+b.y/H*76-2,4,4)}
+ ctx.fillStyle='#48baff';ctx.beginPath();ctx.arc(W-145+player.x/W*102,80+player.y/H*76,4,0,7);ctx.fill();
+ // hit/health bars
+ ctx.fillStyle='#0a1420cc';ctx.fillRect(30,H-70,240,42);ctx.fillStyle='#21364d';ctx.fillRect(42,H-50,210,10);ctx.fillStyle='#38a9ff';ctx.fillRect(42,H-50,210*Math.max(0,player.hp/100),10);
+ ctx.fillStyle='#f0f6ff';ctx.font='bold 15px Arial';ctx.fillText('OPERADOR 01',42,H-55);
+ ctx.fillStyle='#dce8f8';ctx.font='bold 14px Arial';ctx.fillText('VIDA '+Math.max(0,Math.ceil(player.hp)),218,H-55);
+ // Barra de apoio aéreo
+ ctx.fillStyle='#0a1420dd';ctx.fillRect(30,H-116,250,34);
+ ctx.fillStyle='#dce8f8';ctx.font='bold 12px Arial';ctx.fillText('APOIO AÉREO  [E]',42,H-96);
+ ctx.fillStyle='#26394a';ctx.fillRect(42,H-88,220,7);
+ ctx.fillStyle=airCharge>=100?'#ffb347':'#d4a65b';ctx.fillRect(42,H-88,220*airCharge/100,7);
+ if(airCharge>=100){ctx.fillStyle='#ffe3a8';ctx.font='bold 11px Arial';ctx.fillText('PRONTO!',218,H-96)}
+ // crosshair
+ ctx.strokeStyle='#f5fbff';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(mouse.x-8,mouse.y);ctx.lineTo(mouse.x-3,mouse.y);ctx.moveTo(mouse.x+3,mouse.y);ctx.lineTo(mouse.x+8,mouse.y);ctx.moveTo(mouse.x,mouse.y-8);ctx.lineTo(mouse.x,mouse.y-3);ctx.moveTo(mouse.x,mouse.y+3);ctx.lineTo(mouse.x,mouse.y+8);ctx.stroke();
+ // top score
+ ctx.fillStyle='#0a1420d9';ctx.fillRect(W/2-115,22,230,42);ctx.fillStyle='#3daeff';ctx.fillRect(W/2-115,22,80,42);ctx.fillStyle='#ff5966';ctx.fillRect(W/2+35,22,80,42);
+ ctx.font='bold 22px Arial';ctx.textAlign='center';ctx.fillStyle='white';ctx.fillText(String(kills).padStart(2,'0'),W/2-75,50);ctx.fillText(String(bots.length).padStart(2,'0'),W/2+75,50);ctx.font='bold 11px Arial';ctx.fillStyle='#d5e4f8';ctx.fillText('ELIMS',W/2,48);ctx.textAlign='left';
+}
+function drawCharacter(e,team,isPlayer=false){
+ ctx.save();
+ ctx.translate(e.x,e.y);
+ ctx.rotate(e.angle);
+ // shadow
+ ctx.fillStyle='#0008';ctx.beginPath();ctx.ellipse(2,6,18,14,0,0,Math.PI*2);ctx.fill();
+ // legs and boots
+ ctx.fillStyle='#17212c';
+ ctx.fillRect(-10,-9,10,18);ctx.fillRect(1,-9,10,18);
+ ctx.fillStyle='#070d14';ctx.fillRect(-12,-10,8,6);ctx.fillRect(5,4,8,6);
+ // arms
+ ctx.fillStyle=team==='blue'?'#246e9e':'#87303b';
+ ctx.fillRect(-7,-14,15,7);ctx.fillRect(-7,7,15,7);
+ // tactical vest / torso
+ ctx.fillStyle=team==='blue'?'#237db6':(e.flash>0?'#fff':'#b83d4a');
+ ctx.beginPath();ctx.roundRect(-11,-11,22,22,5);ctx.fill();
+ ctx.strokeStyle=team==='blue'?'#80d8ff':'#ff9ba3';ctx.lineWidth=1.5;ctx.stroke();
+ // vest plates
+ ctx.fillStyle=team==='blue'?'#164b70':'#742833';ctx.fillRect(-6,-7,12,14);
+ ctx.fillStyle='#d2b77b';ctx.fillRect(-4,-4,3,4);ctx.fillRect(1,-4,3,4);
+ // helmet and face
+ ctx.fillStyle='#e0b991';ctx.beginPath();ctx.arc(0,-1,6,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle=team==='blue'?'#174f78':'#6f2630';
+ ctx.beginPath();ctx.arc(0,-3,8,Math.PI,Math.PI*2);ctx.lineTo(8,-1);ctx.lineTo(-8,-1);ctx.closePath();ctx.fill();
+ ctx.fillStyle='#111b27';ctx.fillRect(2,-3,6,3); // visor
+ // rifle points toward aim
+ ctx.fillStyle='#0c131c';ctx.fillRect(5,-4,19,8);
+ ctx.fillStyle='#536577';ctx.fillRect(12,-2,16,4);
+ ctx.fillStyle='#111923';ctx.fillRect(8,2,6,7);
+ ctx.fillStyle='#c8d8e7';ctx.fillRect(24,-1,5,2);
+ ctx.restore();
+ if(!isPlayer){
+   ctx.fillStyle='#101824';ctx.fillRect(e.x-16,e.y-25,32,5);
+   ctx.fillStyle='#ff5966';ctx.fillRect(e.x-15,e.y-24,30*Math.max(0,e.hp/2),3);
+ } else {
+   // small blue marker over player
+   ctx.fillStyle='#7cddff';ctx.beginPath();ctx.moveTo(e.x,e.y-23);ctx.lineTo(e.x-5,e.y-30);ctx.lineTo(e.x+5,e.y-30);ctx.closePath();ctx.fill();
+ }
+}
+function showVictory(){
+ running=true;overlay.style.display='flex';overlay.querySelector('.tag').textContent='MISSÃO CONCLUÍDA';
+ overlay.querySelector('h1').innerHTML='OPERAÇÃO <em>VITÓRIA</em>';
+ overlay.querySelector('p').innerHTML='Objetivo cumprido: <b>'+campaignTarget+' eliminações</b>. O setor foi assegurado.';
+ overlay.querySelectorAll('p')[1].textContent='Jogue novamente ou volte ao menu para escolher outro modo.';
+ startBtn.textContent='REJOGAR CAMPANHA';
+}
+function showEnd(){overlay.style.display='flex';overlay.querySelector('.tag').textContent='MISSÃO ENCERRADA';overlay.querySelector('h1').innerHTML='FIM DE <em>JOGO</em>';overlay.querySelector('p').innerHTML=`Tu conseguiu <b>${kills}</b> eliminações. Bora tentar de novo?`;overlay.querySelectorAll('p')[1].textContent='Pressiona ENTER ou clica abaixo para reiniciar.';startBtn.textContent='JOGAR NOVAMENTE'}
+function start(mode='arena'){
+ gameMode=mode;reset();
+ if(gameMode==='campaign'){
+   for(let i=0;i<3;i++)spawnBot(true);
+   overlay.querySelector('.tag').textContent='CAMPANHA // OPERAÇÃO 01';
+   overlay.querySelector('h1').innerHTML='OPERAÇÃO <em>FRONTLINE</em>';
+ }
+ running=true;overlay.style.display='none';last=performance.now();requestAnimationFrame(loop)
+}
+document.getElementById('campaignBtn').addEventListener('click',()=>start('campaign'));
+function loop(t){if(!running)return;let dt=Math.min(.033,(t-last)/1000||0);last=t;update(dt);draw();requestAnimationFrame(loop)}
+window.addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key.toLowerCase()==='r'&&reloadTimer<=0&&ammo<30&&reserve>0){reloadTimer=1.1}if(e.key==='Enter'&&gameOver)start()});
+window.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+canvas.addEventListener('mousemove',e=>{let r=canvas.getBoundingClientRect();mouse.x=(e.clientX-r.left)*W/r.width;mouse.y=(e.clientY-r.top)*H/r.height});
+canvas.addEventListener('mousedown',e=>{if(e.button===0)mouse.down=true});
+window.addEventListener('mouseup',()=>mouse.down=false);
+startBtn.addEventListener('click',()=>start(gameMode));
+reset();draw();
+})();
+</script>
+</body>
+</html>
