@@ -36,7 +36,7 @@
     <div class="hud">
       <div class="stat">ELIMINAÇÕES <b id="kills">0</b></div>
       <div class="stat">VIDA <b id="health">100</b></div>
-      <div class="stat">MUNIÇÃO <b id="ammo">30 / 90</b></div>
+      <div class="stat">MUNIÇÃO <b id="ammo">45 / 150</b></div>
     </div>
   </header>
   <div class="gamebox">
@@ -61,7 +61,7 @@
       </div>
     </div>
   </div>
-  <div class="controls"><span>W A S D — mover</span><span>MOUSE — mirar</span><span>CLIQUE — atirar</span><span>R — recarregar</span><span>E — ataque aéreo (barra cheia)</span><span>ENTER — reiniciar após derrota</span></div>
+  <div class="controls"><span>W A S D — mover</span><span>MOUSE — mirar</span><span>CLIQUE — atirar</span><span>R — recarregar</span><span>F — abrir caixa de munição</span><span>E — ataque aéreo (barra cheia)</span><span>ENTER — reiniciar após derrota</span></div>
   <div class="bottom"><span>VERSÃO 0.6 • CAMPANHA 6 OPERAÇÕES + APOIO AÉREO</span><span>Projeto original de demonstração — <span class="blue">NEXUS</span></span></div>
 </div>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -71,15 +71,16 @@ const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
 const overlay=document.getElementById('overlay'),startBtn=document.getElementById('start');
 const ui={kills:document.getElementById('kills'),health:document.getElementById('health'),ammo:document.getElementById('ammo')};
 const W=canvas.width,H=canvas.height;
-let keys={},mouse={x:W/2,y:H/2,down:false},player,bots,bullets,particles,kills,ammo,reserve,reloadTimer,gameOver,running,last=0,spawnTimer,airCharge,planes,bombs,airstrikeFlash;
+const MAG_SIZE=45,MAX_RESERVE=240;
+let keys={},mouse={x:W/2,y:H/2,down:false},player,bots,bullets,particles,kills,ammo,reserve,reloadTimer,gameOver,running,last=0,spawnTimer,airCharge,planes,bombs,airstrikeFlash,raidTimer;
 let gameMode='arena',campaignTarget=8,campaignStage=1;
 const campaignStages=[
- {name:'NORMANDY BEACH',target:8,enemySpeed:1,theme:'beach',palette:{ground:'#151e22',grid:'#22313d',wall:'#6d6256',accent:'#d6b261',hud:'#8ae0ff'}},
- {name:'TRINCHEIRAS DO OESTE',target:10,enemySpeed:1.08,theme:'trench',palette:{ground:'#1a1a1a',grid:'#292d2f',wall:'#5f564a',accent:'#d6b05d',hud:'#9be6ff'}},
- {name:'VILA EM RUÍNAS',target:12,enemySpeed:1.16,theme:'ruins',palette:{ground:'#1d1b1a',grid:'#312a29',wall:'#6c5246',accent:'#d89056',hud:'#9be6ff'}},
- {name:'FLORESTA SOMBRIA',target:14,enemySpeed:1.24,theme:'forest',palette:{ground:'#121b17',grid:'#1f322b',wall:'#456a4d',accent:'#d7c76d',hud:'#9be6ff'}},
- {name:'CIDADE DE BERLIM',target:16,enemySpeed:1.32,theme:'city',palette:{ground:'#171c22',grid:'#25313d',wall:'#5f6975',accent:'#d4b96f',hud:'#9be6ff'}},
- {name:'FORTALEZA FINAL',target:18,enemySpeed:1.42,theme:'fortress',palette:{ground:'#191910',grid:'#2b2d1f',wall:'#6b5f4c',accent:'#e0c469',hud:'#9be6ff'}}
+ {name:'NORMANDY BEACH',target:8,enemySpeed:1,theme:'beach',palette:{ground:'#6b6249',grid:'#22313d',wall:'#887653',accent:'#d6b261',hud:'#8ae0ff'}},
+ {name:'TRINCHEIRAS DO OESTE',target:10,enemySpeed:1.08,theme:'trench',palette:{ground:'#63583f',grid:'#292d2f',wall:'#87714f',accent:'#d6b05d',hud:'#9be6ff'}},
+ {name:'VILA EM RUÍNAS',target:12,enemySpeed:1.16,theme:'ruins',palette:{ground:'#62594c',grid:'#312a29',wall:'#85745a',accent:'#d89056',hud:'#9be6ff'}},
+ {name:'FLORESTA SOMBRIA',target:14,enemySpeed:1.24,theme:'forest',palette:{ground:'#45513b',grid:'#1f322b',wall:'#66724f',accent:'#d7c76d',hud:'#9be6ff'}},
+ {name:'CIDADE DE BERLIM',target:16,enemySpeed:1.32,theme:'city',palette:{ground:'#5d594c',grid:'#25313d',wall:'#817661',accent:'#d4b96f',hud:'#9be6ff'}},
+ {name:'FORTALEZA FINAL',target:18,enemySpeed:1.42,theme:'fortress',palette:{ground:'#55523d',grid:'#2b2d1f',wall:'#7d704e',accent:'#e0c469',hud:'#9be6ff'}}
 ];
 const stageLayouts=[
  [
@@ -120,12 +121,12 @@ const stageLayouts=[
  ]
 ];
 const ammoPointsByStage=[
- [[190,300],[520,260],[910,260],[1180,700],[740,680],[700,110]],
- [[220,430],[450,210],[955,230],[1220,460],[700,280],[1100,700]],
- [[180,250],[540,520],[980,260],[1210,600],[700,180],[660,720]],
- [[240,470],[520,260],[900,230],[1160,470],[700,470],[650,710]],
- [[220,350],[510,210],[910,210],[1190,610],[740,650],[680,120]],
- [[180,300],[540,250],[930,250],[1200,700],[760,260],[700,610]]
+ [[190,300],[520,260],[910,260],[1180,700],[740,680],[700,110],[80,260],[450,460],[950,450],[1320,480]],
+ [[220,430],[450,210],[955,230],[1220,460],[700,280],[1100,700],[80,260],[450,460],[950,450],[1320,480]],
+ [[180,250],[540,520],[980,260],[1210,600],[700,180],[660,720],[80,260],[450,460],[950,450],[1320,480]],
+ [[240,470],[520,260],[900,230],[1160,470],[700,470],[650,710],[80,260],[450,460],[950,450],[1320,480]],
+ [[220,350],[510,210],[910,210],[1190,610],[740,650],[680,120],[80,260],[450,460],[950,450],[1320,480]],
+ [[180,300],[540,250],[930,250],[1200,700],[760,260],[700,610],[80,260],[450,460],[950,450],[1320,480]]
 ];
 const net={peer:null,conn:null,connections:[],remote:{},lastSend:0,localId:null};
 const netStatus=document.getElementById('netStatus'),roomShare=document.getElementById('roomShare');
@@ -184,12 +185,20 @@ function loadStage(stageIndex=0){
  for(const item of stageLayouts[stageIndex]||stageLayouts[0])walls.push({...item});
  ammoCrates=[];
  const points=ammoPointsByStage[stageIndex]||ammoPointsByStage[0];
- for(const [x,y] of points)ammoCrates.push({x,y,r:10,amount:18});
+ for(const [x,y] of points)ammoCrates.push({x,y,r:10,amount:30});
  player.x=700;player.y=760;player.angle=-Math.PI/2;
+}
+function spawnAirRaid(){
+ if(gameOver||!running)return;
+ const x = -90;
+ const y = 60 + Math.random()*160;
+ const targetX = 200 + Math.random()*(W-400);
+ const targetY = 140 + Math.random()*(H-280);
+ planes.push({x,y,vx:360+Math.random()*90,vy:18+Math.random()*14,targetX,targetY,drop:0.22,drops:9});
 }
 function reset(){
  player={x:700,y:760,r:14,angle:-Math.PI/2,hp:100,inv:0};
- bots=[];bullets=[];particles=[];kills=0;ammo=30;reserve=90;reloadTimer=0;gameOver=false;spawnTimer=0;airCharge=0;planes=[];bombs=[];airstrikeFlash=0;
+ bots=[];bullets=[];particles=[];kills=0;ammo=MAG_SIZE;reserve=150;reloadTimer=0;gameOver=false;spawnTimer=0;airCharge=0;planes=[];bombs=[];airstrikeFlash=0;raidTimer=4+Math.random()*4;
  campaignStage=1;campaignTarget=campaignStages[0].target;loadStage(0);for(let i=0;i<7;i++)spawnBot(true);updateUI();
 }
 function spawnBot(initial=false){
@@ -213,20 +222,22 @@ function tryShoot(){
  shoot(player.x,player.y,player.angle,'blue');
  sendNet({type:'shot',x:player.x,y:player.y,angle:player.angle});
  ammo--;
- player.cool=.13;
+ player.cool=.16;
  burst(player.x+Math.cos(player.angle)*19,player.y+Math.sin(player.angle)*19,'#ffd27a',2);
  updateUI();
  return true;
 }
 function update(dt){
  if(!running||gameOver)return;
- if(reloadTimer>0){reloadTimer-=dt;if(reloadTimer<=0){let need=30-ammo,take=Math.min(need,reserve);ammo+=take;reserve-=take}}
+ if(reloadTimer>0){reloadTimer-=dt;if(reloadTimer<=0){let need=MAG_SIZE-ammo,take=Math.min(need,reserve);ammo+=take;reserve-=take}}
  player.inv=Math.max(0,player.inv-dt);
  let dx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0),dy=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0);
  if(dx||dy){let l=Math.hypot(dx,dy);moveEntity(player,dx/l*220*dt,dy/l*220*dt)}
  player.angle=Math.atan2(mouse.y-player.y,mouse.x-player.x);
  if(mouse.down)tryShoot();
  player.cool=Math.max(0,(player.cool||0)-dt);
+ raidTimer-=dt;
+ if(raidTimer<=0){spawnAirRaid();raidTimer=7+Math.random()*8;}
  // Habilidade aérea: a barra carrega com o tempo; aperta E quando estiver cheia.
  airCharge=Math.min(100,airCharge+dt*4.5);
  airstrikeFlash=Math.max(0,airstrikeFlash-dt);
@@ -275,65 +286,99 @@ function update(dt){
    }
    if(hit)bullets.splice(i,1);
  }
- for(let i=ammoCrates.length-1;i>=0;i--){
-   const crate=ammoCrates[i];
-   if(Math.hypot(player.x-crate.x,player.y-crate.y)<player.r+16){
-     let gain=crate.amount;
-     if(ammo<30){const refill=Math.min(30-ammo,gain);ammo+=refill;gain-=refill;}
-     reserve=Math.min(180,reserve+gain);
-     ammoCrates.splice(i,1);
-     burst(crate.x,crate.y,'#83d6ff',12);
-     updateUI();
-   }
- }
  if(spawnTimer>0){spawnTimer-=dt;if(spawnTimer<=0&&bots.length<6)spawnBot()}
  for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;if(p.life<=0)particles.splice(i,1)}
  updateUI();
 }
 function updateUI(){ui.kills.textContent=kills;ui.health.textContent=Math.max(0,Math.ceil(player?.hp||100));ui.ammo.textContent=`${ammo} / ${reserve}`}
+function nearbyAmmoCrate(){
+ if(!player||ammo>=MAG_SIZE&&reserve>=MAX_RESERVE)return null;
+ let nearest=null,distance=58;
+ for(const crate of ammoCrates){
+   const current=Math.hypot(player.x-crate.x,player.y-crate.y);
+   if(current<distance){nearest=crate;distance=current}
+ }
+ return nearest;
+}
+function openAmmoCrate(){
+ if(!running||gameOver)return;
+ const crate=nearbyAmmoCrate();
+ if(!crate)return;
+ let gain=crate.amount;
+ if(ammo<MAG_SIZE){const refill=Math.min(MAG_SIZE-ammo,gain);ammo+=refill;gain-=refill;}
+ reserve=Math.min(MAX_RESERVE,reserve+gain);
+ ammoCrates.splice(ammoCrates.indexOf(crate),1);
+ burst(crate.x,crate.y,'#83d6ff',12);
+ updateUI();
+}
 function draw(){
  const stage=campaignStages[Math.min(campaignStage-1, campaignStages.length-1)]||campaignStages[0];
  ctx.clearRect(0,0,W,H);
  ctx.fillStyle=stage.palette.ground;ctx.fillRect(0,0,W,H);
- // floor grid
- ctx.strokeStyle=stage.palette.grid;ctx.lineWidth=1;
- for(let x=20;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,20);ctx.lineTo(x,H-20);ctx.stroke()}
- for(let y=20;y<H;y+=40){ctx.beginPath();ctx.moveTo(20,y);ctx.lineTo(W-20,y);ctx.stroke()}
- // Textura de terreno de guerra: terra batida, crateras, arame farpado e trincheiras.
- for(let i=0;i<24;i++){
-   const tx=55+(i*173)% (W-110),ty=75+(i*97)%(H-150);
-   ctx.fillStyle=i%2?'#17251f':'#1a2525';ctx.beginPath();ctx.ellipse(tx,ty,24+(i%4)*5,8+(i%3)*4,(i%5)*.3,0,Math.PI*2);ctx.fill();
+ // Textura de campo aberto, com terra batida e manchas de vegetação.
+ for(let i=0;i<68;i++){
+   const tx=22+(i*137)%(W-44),ty=28+(i*83+Math.floor(i/4)*29)%(H-56);
+   ctx.fillStyle=['#82764e','#3f4935','#6c603f'][i%3];ctx.globalAlpha=i%3===1?.2:.16;
+   ctx.beginPath();ctx.ellipse(tx,ty,20+(i%4)*10,8+(i%3)*7,(i%7)*.23,0,Math.PI*2);ctx.fill();
  }
- // Trincheiras em segmentos interrompidos, deixando passagens de combate.
- ctx.strokeStyle='#493f30';ctx.lineWidth=18;ctx.beginPath();ctx.moveTo(70,470);ctx.lineTo(300,470);ctx.lineTo(300,500);ctx.lineTo(480,500);ctx.moveTo(900,300);ctx.lineTo(1110,300);ctx.lineTo(1110,330);ctx.lineTo(1320,330);ctx.stroke();
- ctx.strokeStyle='#786347';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(70,461);ctx.lineTo(300,461);ctx.lineTo(300,491);ctx.lineTo(480,491);ctx.moveTo(900,291);ctx.lineTo(1110,291);ctx.lineTo(1110,321);ctx.lineTo(1320,321);ctx.stroke();
- // Crateras de bombardeio
- for(const c of [[470,700,30],[930,460,24],[1250,600,34],[180,700,20],[680,280,23],[1040,740,27]]){ctx.fillStyle='#0a1016';ctx.beginPath();ctx.ellipse(c[0],c[1],c[2],c[2]*.55,-.2,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#514638';ctx.lineWidth=4;ctx.stroke();}
- // outer boundary
- ctx.strokeStyle='#45617c';ctx.lineWidth=5;ctx.strokeRect(20,20,W-40,H-40);
- // floor markings
- ctx.strokeStyle='#dba83d';ctx.lineWidth=3;ctx.setLineDash([10,8]);
- ctx.strokeRect(350,225,300,150);ctx.setLineDash([]);
- ctx.fillStyle='#25384d';ctx.font='bold 20px Arial';ctx.fillText('SECTOR B',45,60);ctx.fillText('NEXUS // ARENA',W-235,58);
+ ctx.globalAlpha=1;
+ ctx.strokeStyle='#a29b68';ctx.lineWidth=2;
+ for(let i=0;i<76;i++){
+   const gx=28+(i*157)%(W-56),gy=24+(i*97)%(H-48);
+   ctx.beginPath();ctx.moveTo(gx,gy);ctx.lineTo(gx+3,gy-5);ctx.moveTo(gx+3,gy);ctx.lineTo(gx+7,gy-4);ctx.stroke();
+ }
+ // Trilha de terra atravessando o campo.
+ ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-20,660);ctx.quadraticCurveTo(250,600,455,640);ctx.quadraticCurveTo(690,685,870,545);ctx.quadraticCurveTo(1110,365,1420,420);
+ ctx.strokeStyle='#403a2b';ctx.lineWidth=82;ctx.stroke();ctx.strokeStyle='#786744';ctx.lineWidth=66;ctx.stroke();
+ ctx.setLineDash([24,20]);ctx.strokeStyle='#9b8758';ctx.lineWidth=2;ctx.stroke();ctx.setLineDash([]);ctx.lineCap='butt';
+ // Árvores e arbustos vistos de cima.
+ for(let i=0;i<18;i++){
+   const px=70+(i*94)% (W-120), py=80+((i*61)%(H-120));
+   const radius=13+(i%3)*4;
+   ctx.fillStyle='#282a21';ctx.beginPath();ctx.ellipse(px+3,py+5,radius+3,radius*.7,0,0,Math.PI*2);ctx.fill();
+   ctx.fillStyle=stage.theme==='forest'?'#263d29':'#35432d';ctx.beginPath();ctx.arc(px,py,radius,0,Math.PI*2);ctx.fill();
+   ctx.fillStyle=stage.theme==='beach'?'#68744a':'#4e6037';ctx.beginPath();ctx.arc(px-4,py-4,radius*.58,0,Math.PI*2);ctx.fill();
+ }
+ // Trincheiras de terra com bordas reforçadas.
+ const drawTrench=()=>{ctx.beginPath();ctx.moveTo(70,470);ctx.lineTo(300,470);ctx.lineTo(300,500);ctx.lineTo(480,500);ctx.moveTo(900,300);ctx.lineTo(1110,300);ctx.lineTo(1110,330);ctx.lineTo(1320,330)};
+ drawTrench();ctx.strokeStyle='#342f25';ctx.lineWidth=32;ctx.stroke();
+ drawTrench();ctx.strokeStyle='#796443';ctx.lineWidth=23;ctx.stroke();
+ drawTrench();ctx.setLineDash([14,7]);ctx.strokeStyle='#b09c6d';ctx.lineWidth=3;ctx.stroke();ctx.setLineDash([]);
+ // Crateras de bombardeio com bordas de terra levantada.
+ for(const c of [[470,700,30],[930,460,24],[1250,600,34],[180,700,20],[680,280,23],[1040,740,27]]){
+   ctx.fillStyle='#8a7951';ctx.beginPath();ctx.ellipse(c[0],c[1],c[2]+5,(c[2]+5)*.58,-.2,0,Math.PI*2);ctx.fill();
+   ctx.fillStyle='#38352a';ctx.beginPath();ctx.ellipse(c[0],c[1],c[2],c[2]*.55,-.2,0,Math.PI*2);ctx.fill();
+   ctx.fillStyle='#29291f';ctx.beginPath();ctx.ellipse(c[0]-3,c[1]-2,c[2]*.58,c[2]*.29,-.2,0,Math.PI*2);ctx.fill();
+ }
+ // Limite baixo e terroso do campo de batalha.
+ ctx.strokeStyle='#343a2c';ctx.lineWidth=12;ctx.strokeRect(20,20,W-40,H-40);
+ ctx.strokeStyle='#a39363';ctx.lineWidth=2;ctx.strokeRect(26,26,W-52,H-52);
  if(gameMode==='campaign'){ctx.fillStyle='#f2d08b';ctx.font='bold 14px Arial';ctx.fillText('FASE '+campaignStage+'/6 • '+(campaignStages[campaignStage-1]?.name||'OPERAÇÃO FINAL')+' • '+kills+'/'+campaignTarget,340,48);}
- // Bandeiras de setor e sinais de zona de combate
- ctx.save();
- ctx.globalAlpha=.6;
- ctx.fillStyle='#d7c18a';ctx.font='bold 13px Arial';ctx.fillText('ZONA DE COMBATE',W/2-70,H/2+155);
- ctx.strokeStyle='#bda66c';ctx.lineWidth=2;ctx.setLineDash([7,8]);
- ctx.beginPath();ctx.moveTo(55,245);ctx.lineTo(255,245);ctx.moveTo(W-255,H-220);ctx.lineTo(W-55,H-220);ctx.stroke();ctx.setLineDash([]);
- ctx.restore();
  // cover and walls
  for(const a of walls){
+   ctx.fillStyle='#302d24';ctx.fillRect(a.x+4,a.y+5,a.w,a.h);
    ctx.fillStyle=stage.palette.wall;ctx.fillRect(a.x,a.y,a.w,a.h);
-   ctx.fillStyle='#3a526c';ctx.fillRect(a.x,a.y,a.w,7);
-   ctx.strokeStyle='#101a27';ctx.lineWidth=3;ctx.strokeRect(a.x,a.y,a.w,a.h);
-   ctx.fillStyle=stage.palette.accent;ctx.fillRect(a.x+8,a.y+a.h-7,Math.max(18,a.w*.32),4);
+   ctx.strokeStyle='#443f31';ctx.lineWidth=3;ctx.strokeRect(a.x,a.y,a.w,a.h);
+   ctx.fillStyle=stage.theme==='city'||stage.theme==='ruins'?'#a69a7a':'#b1a077';
+   if(a.w>=a.h){
+     for(let sx=a.x+9;sx<a.x+a.w-5;sx+=19){ctx.beginPath();ctx.ellipse(sx,a.y+6,9,5,0,0,Math.PI*2);ctx.fill();}
+   }else{
+     for(let sy=a.y+9;sy<a.y+a.h-5;sy+=19){ctx.beginPath();ctx.ellipse(a.x+6,sy,5,9,0,0,Math.PI*2);ctx.fill();}
+   }
+   ctx.fillStyle=stage.palette.accent;ctx.fillRect(a.x+8,a.y+a.h-7,Math.max(18,a.w*.32),3);
  }
  for(const c of ammoCrates){
-   ctx.fillStyle='#d9f0ff';ctx.fillRect(c.x-10,c.y-10,20,20);
-   ctx.fillStyle='#3b9fe8';ctx.fillRect(c.x-8,c.y-8,16,16);
-   ctx.fillStyle='#dff3ff';ctx.fillText('M',c.x-4,c.y+4);
+   ctx.fillStyle='#253526';ctx.fillRect(c.x-12,c.y-10,24,20);
+   ctx.fillStyle='#68764a';ctx.fillRect(c.x-10,c.y-8,20,16);
+   ctx.fillStyle='#b6a46a';ctx.fillRect(c.x-2,c.y-8,4,16);
+   ctx.fillRect(c.x-10,c.y-2,20,4);
+   ctx.fillStyle='#f0e5bd';ctx.font='bold 9px Arial';ctx.fillText('M',c.x-3,c.y+3);
+ }
+ const nearbyCrate=nearbyAmmoCrate();
+ if(nearbyCrate){
+   ctx.fillStyle='#08111de8';ctx.fillRect(nearbyCrate.x-58,nearbyCrate.y-38,116,22);
+   ctx.strokeStyle='#d6c17d';ctx.lineWidth=1;ctx.strokeRect(nearbyCrate.x-58,nearbyCrate.y-38,116,22);
+   ctx.fillStyle='#fff0bd';ctx.font='bold 12px Arial';ctx.textAlign='center';ctx.fillText('F  ABRIR CAIXA',nearbyCrate.x,nearbyCrate.y-23);ctx.textAlign='left';
  }
  // crates
  for(const [x,y] of [[90,115],[1270,115],[320,700],[920,700],[650,155],[800,250],[470,580],[1120,470],[600,750],[1240,740]]){
@@ -440,7 +485,7 @@ function advanceCampaign(){
  const stage=campaignStages[campaignStage-1];
  campaignTarget+=stage.target;
  // Reforços chegam entre fases; o jogador recupera parte da vida e munição.
- player.hp=Math.min(100,player.hp+25);ammo=30;reserve=Math.min(180,reserve+45);bullets=[];bombs=[];planes=[];airCharge=100;
+ player.hp=Math.min(100,player.hp+25);ammo=MAG_SIZE;reserve=Math.min(MAX_RESERVE,reserve+60);bullets=[];bombs=[];planes=[];airCharge=100;
  loadStage(campaignStage-1);
  for(let i=0;i<Math.min(5+campaignStage,9);i++)spawnBot(true);
  burst(player.x,player.y,'#74caff',28);updateUI();
@@ -471,7 +516,7 @@ function start(mode='arena'){
 }
 document.getElementById('campaignBtn').addEventListener('click',()=>start('campaign'));
 function loop(t){if(!running)return;let dt=Math.min(.033,(t-last)/1000||0);last=t;update(dt);draw();requestAnimationFrame(loop)}
-window.addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key.toLowerCase()==='r'&&reloadTimer<=0&&ammo<30&&reserve>0){reloadTimer=1.1}if(e.key==='Enter'&&gameOver)start()});
+window.addEventListener('keydown',e=>{const key=e.key.toLowerCase();keys[key]=true;if(key==='f'&&!e.repeat)openAmmoCrate();if(key==='r'&&reloadTimer<=0&&ammo<MAG_SIZE&&reserve>0){reloadTimer=1.1}if(e.key==='Enter'&&gameOver)start()});
 window.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
 canvas.addEventListener('mousemove',e=>{let r=canvas.getBoundingClientRect();mouse.x=(e.clientX-r.left)*W/r.width;mouse.y=(e.clientY-r.top)*H/r.height});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
