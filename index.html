@@ -269,6 +269,15 @@ async function saveMatchResult(won){
 }
 function statusNet(s){netStatus.textContent=s}
 function hasConnectedPeers(){return gameMode==='arena'&&Boolean(net.conn?.open||net.connections.some(connection=>connection.open))}
+function closeNetworkSession(){
+ for(const connection of [...net.connections,...(net.conn?[net.conn]:[])])try{connection.close()}catch{}
+ net.connections=[];net.conn=null;net.remote={};net.localId=null;net.matchId=null;net.matchCode=null;net.resultSaved=false;net.isHost=false;
+ if(net.peer){try{net.peer.destroy()}catch{}net.peer=null}
+}
+function setAwaitingLeader(){
+ if(net.isHost||!net.peer)return;
+ startBtn.textContent='AGUARDANDO LÍDER';startBtn.disabled=true;
+}
 function sendNet(data){
  const packet={...data,from:net.localId};
  if(net.conn&&net.conn.open)net.conn.send(packet);
@@ -292,19 +301,19 @@ function receiveNet(data){
  if(data.type==='enemyShot'&&hasConnectedPeers())bullets.push({x:data.x,y:data.y,vx:Math.cos(data.angle)*300,vy:Math.sin(data.angle)*300,life:1.7,team:'red',damage:8});
  if(data.type==='airstrike'&&hasConnectedPeers())planes.push({x:-90,y:data.y,vx:390,vy:35,targetX:data.x,targetY:data.ty,drop:.2,drops:8});
  if(data.type==='match'){net.matchId=data.matchId;net.resultSaved=false;saveMatchPlayerEntry()}
- if(data.type==='start'&&!net.isHost){net.matchId=data.matchId||net.matchId;start('arena',true)}
+ if(data.type==='start'&&!net.isHost){net.matchId=data.matchId||net.matchId;startBtn.disabled=false;start('arena',true)}
  if(data.type==='matchEnd'&&hasConnectedPeers()&&!net.isHost&&!gameOver){gameOver=true;if(data.won)showVictory();else showEnd(false)}
  if(data.type==='hello'&&net.isHost&&net.matchId)sendNet({type:'match',matchId:net.matchId});
 }
 function setupConnection(c){
- c.on('open',()=>{statusNet('Conectado! O líder pode iniciar a partida.');c.send({type:'hello',from:net.localId,nickname:profileNickname||'Soldado'});if(net.matchId)c.send({type:'match',matchId:net.matchId});if(net.isHost&&running&&gameMode==='arena'){c.send({type:'start',from:net.localId,matchId:net.matchId});setMatchStatus('playing')}});
+ c.on('open',()=>{statusNet(net.isHost?'Aliado conectado. Você é o líder da sala.':'Conectado como convidado. Aguarde o líder iniciar.');c.send({type:'hello',from:net.localId,nickname:profileNickname||'Soldado'});if(net.matchId)c.send({type:'match',matchId:net.matchId});if(net.isHost&&running&&!gameOver&&gameMode==='arena'){c.send({type:'start',from:net.localId,matchId:net.matchId});setMatchStatus('playing')}else if(!net.isHost)setAwaitingLeader()});
  c.on('data',receiveNet);
  c.on('close',()=>{delete net.remote[c.peer];statusNet('A conexão com o outro jogador foi encerrada.')});
  c.on('error',()=>statusNet('Falha na conexão. Confira o código e tente novamente.'));
 }
 function createRoom(attempt=0){
  if(!window.Peer){statusNet('A conexão online não carregou. Confira a internet e recarregue a página.');return;}
- if(attempt===0){statusNet('Criando sala online…');roomShare.style.display='none';}
+ if(attempt===0){closeNetworkSession();net.isHost=true;statusNet('Criando sala online…');roomShare.style.display='none';startBtn.disabled=false;}
  try{
   if(attempt===0){net.isHost=true;net.matchId=null;net.matchCode=null;net.resultSaved=false;}
   const roomCode=String(Math.floor(10000000+Math.random()*90000000));
@@ -314,7 +323,7 @@ function createRoom(attempt=0){
    roomShare.style.display='block';
    roomShare.textContent='CÓDIGO DA SALA: '+roomCode+' — envie este código ao amigo.';
    statusNet('Sala criada! Aguarde seu amigo conectar.');
-    createMatchRecord(roomCode,running?'playing':'waiting');
+    createMatchRecord(roomCode,running&&!gameOver?'playing':'waiting');
   });
   peer.on('connection',c=>{net.connections.push(c);setupConnection(c);});
   peer.on('error',e=>{
@@ -327,11 +336,12 @@ function joinRoom(){
  const id=document.getElementById('roomCode').value.trim();
  if(!/^\d{8}$/.test(id)){statusNet('Digite o código numérico de 8 dígitos.');return}
  if(!window.Peer){statusNet('A conexão online não carregou. Confira a internet e recarregue a página.');return;}
+ closeNetworkSession();roomShare.style.display='none';startBtn.disabled=false;
  statusNet('Conectando à sala…');
  try{
   net.isHost=false;net.matchId=null;net.matchCode=null;net.resultSaved=false;
   net.peer=new Peer();
-  net.peer.on('open',myId=>{net.localId=myId;net.conn=net.peer.connect(id,{reliable:true});setupConnection(net.conn);});
+  net.peer.on('open',myId=>{net.localId=myId;roomShare.style.display='block';roomShare.textContent='ENTRANDO NA SALA: '+id;net.conn=net.peer.connect(id,{reliable:true});setupConnection(net.conn);});
   net.peer.on('error',e=>statusNet('Não foi possível conectar: '+(e.type||'verifique o código')+'.'));
  }catch(e){statusNet('Não foi possível entrar na sala.')}
 }
@@ -702,12 +712,14 @@ function showVictory(){
  overlay.querySelector('p').innerHTML='Objetivo cumprido: <b>'+campaignTarget+' eliminações</b>. O setor foi assegurado.';
  overlay.querySelectorAll('p')[1].textContent='Jogue novamente ou volte ao menu para escolher outro modo.';
  startBtn.textContent='REJOGAR CAMPANHA';
+ if(gameMode==='arena'&&!net.isHost&&net.peer){startBtn.textContent='AGUARDANDO LÍDER';startBtn.disabled=true}
  saveMatchResult(true);if(net.isHost&&hasConnectedPeers())sendNet({type:'matchEnd',won:true});
 }
-function showEnd(notifyNetwork=true){overlay.style.display='flex';overlay.querySelector('.tag').textContent='MISSÃO ENCERRADA';overlay.querySelector('h1').innerHTML='FIM DE <em>JOGO</em>';overlay.querySelector('p').innerHTML=`Tu conseguiu <b>${kills}</b> eliminações. Bora tentar de novo?`;overlay.querySelectorAll('p')[1].textContent='Pressiona ENTER ou clica abaixo para reiniciar.';startBtn.textContent='JOGAR NOVAMENTE';saveMatchResult(false);if(notifyNetwork&&net.isHost&&hasConnectedPeers())sendNet({type:'matchEnd',won:false})}
+function showEnd(notifyNetwork=true){overlay.style.display='flex';overlay.querySelector('.tag').textContent='MISSÃO ENCERRADA';overlay.querySelector('h1').innerHTML='FIM DE <em>JOGO</em>';overlay.querySelector('p').innerHTML=`Tu conseguiu <b>${kills}</b> eliminações. Bora tentar de novo?`;overlay.querySelectorAll('p')[1].textContent='Pressiona ENTER ou clica abaixo para reiniciar.';startBtn.textContent='JOGAR NOVAMENTE';startBtn.disabled=false;saveMatchResult(false);if(notifyNetwork&&net.isHost&&hasConnectedPeers())sendNet({type:'matchEnd',won:false});if(hasConnectedPeers()&&!net.isHost)setAwaitingLeader()}
 function start(mode='arena',fromNetwork=false){
  const online=hasConnectedPeers();
- if(mode==='arena'&&online&&!net.isHost&&!fromNetwork){statusNet('Aguardando o líder iniciar a partida.');return}
+ if(mode==='arena'&&online&&!net.isHost&&!fromNetwork){statusNet('Aguardando o líder iniciar a partida.');setAwaitingLeader();return}
+ startBtn.disabled=false;
  if(mode==='arena'&&online&&net.isHost&&!fromNetwork){sendNet({type:'start',matchId:net.matchId});setMatchStatus('playing')}
  gameMode=mode;reset();
  net.remote={};
@@ -722,6 +734,7 @@ function start(mode='arena',fromNetwork=false){
  running=true;overlay.style.display='none';last=performance.now();requestAnimationFrame(loop)
 }
 async function startCampaign(){
+ if(net.peer){closeNetworkSession();roomShare.style.display='none';statusNet('Campanha offline.')}
  const progress=await loadCampaignProgress();
  start('campaign');
  if(progress){
