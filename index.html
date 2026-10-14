@@ -17,7 +17,7 @@
   .gamebox{position:relative;border:1px solid #28415e;border-radius:12px;overflow:hidden;box-shadow:0 18px 60px #0009;background:#101b2a}
   canvas{display:block;width:100%;height:auto;cursor:crosshair}
   .overlay{position:absolute;inset:0;background:#07101bd9;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px}
-  .panel{max-width:500px;background:#101d30f2;border:1px solid #345578;border-radius:16px;padding:28px;box-shadow:0 10px 40px #0008}
+  .panel{max-width:500px;max-height:calc(100vh - 40px);overflow-y:auto;background:#101d30f2;border:1px solid #345578;border-radius:16px;padding:28px;box-shadow:0 10px 40px #0008}
   h1{margin:0 0 8px;font-size:clamp(28px,5vw,44px);letter-spacing:2px} h1 em{font-style:normal;color:#42b4ff}
   .panel p{color:#b7c8de;line-height:1.6}
   button{border:0;border-radius:8px;padding:13px 24px;background:linear-gradient(135deg,#169bff,#3568ff);color:white;font-size:15px;font-weight:800;letter-spacing:1px;cursor:pointer}
@@ -47,11 +47,29 @@
         <h1>NEXUS <em>ARENA</em></h1>
         <p>Entra na arena, enfrenta soldados inimigos e tenta sobreviver. FPS militar 2D em visão superior.</p>
         <p><b>WASD</b> mover · <b>Mouse</b> mirar · <b>Botão esquerdo</b> atirar · <b>R</b> recarregar</p>
+        <details style="margin:12px 0;padding:10px;background:#091421;border:1px solid #2b4563;border-radius:8px;text-align:left">
+          <summary style="cursor:pointer;font-weight:800;color:#dbeeff">CONTA ONLINE</summary>
+          <div style="display:grid;gap:7px;margin-top:10px">
+            <input id="accountNickname" placeholder="Apelido" maxlength="24" autocomplete="nickname" style="background:#0d1b2c;color:white;border:1px solid #345578;border-radius:7px;padding:9px">
+            <input id="accountEmail" type="email" placeholder="E-mail" autocomplete="email" style="background:#0d1b2c;color:white;border:1px solid #345578;border-radius:7px;padding:9px">
+            <input id="accountPassword" type="password" placeholder="Senha" autocomplete="current-password" style="background:#0d1b2c;color:white;border:1px solid #345578;border-radius:7px;padding:9px">
+            <div><button id="signUp" style="padding:9px 11px;font-size:12px">CRIAR CONTA</button> <button id="signIn" style="padding:9px 11px;font-size:12px">ENTRAR</button> <button id="signOut" hidden style="padding:9px 11px;font-size:12px;background:#5b3840">SAIR</button></div>
+            <div id="accountStatus" style="font-size:12px;color:#9db7d5;line-height:1.5">Conta e ranking online.</div>
+          </div>
+        </details>
+        <details style="margin:12px 0;padding:10px;background:#091421;border:1px solid #2b4563;border-radius:8px;text-align:left">
+          <summary style="cursor:pointer;font-weight:800;color:#dbeeff">RANKING</summary>
+          <ol id="leaderboard" style="margin:10px 0 0;padding-left:24px;color:#dbeeff;font-size:13px"><li>Carregando...</li></ol>
+        </details>
+        <details style="margin:12px 0;padding:10px;background:#091421;border:1px solid #2b4563;border-radius:8px;text-align:left">
+          <summary style="cursor:pointer;font-weight:800;color:#dbeeff">PARTIDAS RECENTES</summary>
+          <ol id="matchHistory" style="margin:10px 0 0;padding-left:24px;color:#dbeeff;font-size:13px"><li>Entre para ver seu histórico.</li></ol>
+        </details>
         <div id="networkBox" style="margin:16px 0;padding:12px;background:#091421;border:1px solid #2b4563;border-radius:10px;text-align:left">
-          <div style="font-weight:800;color:#dbeeff;margin-bottom:8px">MULTIPLAYER ONLINE (BETA)</div>
+          <div style="font-weight:800;color:#dbeeff;margin-bottom:8px">MULTIPLAYER ONLINE</div>
           <button id="hostRoom" style="padding:10px 12px;font-size:12px;margin:0 4px 8px 0">CRIAR SALA</button>
           <div style="display:flex;gap:6px;margin-bottom:8px">
-            <input id="roomCode" placeholder="Código da sala do amigo" maxlength="80" style="min-width:0;flex:1;background:#0d1b2c;color:white;border:1px solid #345578;border-radius:7px;padding:10px">
+            <input id="roomCode" placeholder="Código numérico (8 dígitos)" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" style="min-width:0;flex:1;background:#0d1b2c;color:white;border:1px solid #345578;border-radius:7px;padding:10px">
             <button id="joinRoom" style="padding:10px 12px;font-size:12px">ENTRAR</button>
           </div>
           <div id="netStatus" style="font-size:12px;color:#9db7d5;line-height:1.5">Crie uma sala ou entre com o código de um amigo.</div>
@@ -64,6 +82,8 @@
   <div class="controls"><span>W A S D — mover</span><span>MOUSE — mirar</span><span>CLIQUE — atirar</span><span>R — recarregar</span><span>F — abrir caixa de munição</span><span>E — ataque aéreo (barra cheia)</span><span>ENTER — reiniciar após derrota</span></div>
   <div class="bottom"><span>VERSÃO 0.6 • CAMPANHA 6 OPERAÇÕES + APOIO AÉREO</span><span>Projeto original de demonstração — <span class="blue">NEXUS</span></span></div>
 </div>
+<script src="./supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 (() => {
@@ -72,8 +92,15 @@ const overlay=document.getElementById('overlay'),startBtn=document.getElementByI
 const ui={kills:document.getElementById('kills'),health:document.getElementById('health'),ammo:document.getElementById('ammo')};
 const W=canvas.width,H=canvas.height;
 const MAG_SIZE=45,MAX_RESERVE=240;
+const MATCH_TARGET=20;
 let keys={},mouse={x:W/2,y:H/2,down:false},player,bots,bullets,particles,kills,ammo,reserve,reloadTimer,gameOver,running,last=0,spawnTimer,airCharge,planes,bombs,airstrikeFlash,raidTimer;
 let gameMode='arena',campaignTarget=8,campaignStage=1;
+const supabaseConfig=window.NEXUS_SUPABASE_CONFIG||{};
+let dbClient=null;
+if(window.supabase?.createClient&&supabaseConfig.url&&supabaseConfig.anonKey){try{dbClient=window.supabase.createClient(supabaseConfig.url,supabaseConfig.anonKey)}catch(error){console.error('Configuração Supabase inválida:',error)}}
+const accountUi={nickname:document.getElementById('accountNickname'),email:document.getElementById('accountEmail'),password:document.getElementById('accountPassword'),status:document.getElementById('accountStatus'),signUp:document.getElementById('signUp'),signIn:document.getElementById('signIn'),signOut:document.getElementById('signOut'),leaderboard:document.getElementById('leaderboard'),history:document.getElementById('matchHistory')};
+let currentUser=null,profileNickname='',progressSaveTimer=null;
+try{profileNickname=localStorage.getItem('nexusNickname')||''}catch{}
 const campaignStages=[
  {name:'NORMANDY BEACH',target:8,enemySpeed:1,theme:'beach',palette:{ground:'#6b6249',grid:'#22313d',wall:'#74776c',accent:'#d6b261',hud:'#8ae0ff'}},
  {name:'TRINCHEIRAS DO OESTE',target:10,enemySpeed:1.08,theme:'trench',palette:{ground:'#63583f',grid:'#292d2f',wall:'#87714f',accent:'#d6b05d',hud:'#9be6ff'}},
@@ -128,11 +155,120 @@ const ammoPointsByStage=[
  [[220,350],[510,210],[910,210],[1190,610],[740,650],[680,120],[80,260],[450,460],[950,450],[1320,480]],
  [[180,300],[540,250],[930,250],[1200,700],[760,260],[700,610],[80,260],[450,460],[950,450],[1320,480]]
 ];
-const net={peer:null,conn:null,connections:[],remote:{},lastSend:0,localId:null};
+const net={peer:null,conn:null,connections:[],remote:{},lastSend:0,localId:null,isHost:false,matchId:null,matchCode:null,matchCreating:false,resultSaved:false};
 const netStatus=document.getElementById('netStatus'),roomShare=document.getElementById('roomShare');
 const walls=[];
 let ammoCrates=[];
+function statusAccount(message){accountUi.status.textContent=message}
+function fallbackNickname(user){return user?.user_metadata?.nickname||user?.email?.split('@')[0]||'Soldado'}
+function updateAccountUi(){
+ const signedIn=Boolean(currentUser);
+ accountUi.signUp.hidden=signedIn;accountUi.signIn.hidden=signedIn;accountUi.signOut.hidden=!signedIn;
+ accountUi.email.disabled=signedIn;accountUi.password.disabled=signedIn;accountUi.nickname.disabled=signedIn;
+ if(signedIn){accountUi.nickname.value=profileNickname||fallbackNickname(currentUser);statusAccount('Conectado como '+accountUi.nickname.value+'.')}
+}
+async function loadProfile(){
+ if(!dbClient||!currentUser)return;
+ const {data,error}=await dbClient.from('profiles').select('nickname').eq('id',currentUser.id).maybeSingle();
+ if(error){statusAccount('Não foi possível carregar o perfil. Confira o esquema Supabase.');return}
+ profileNickname=data?.nickname||fallbackNickname(currentUser);
+ try{localStorage.setItem('nexusNickname',profileNickname)}catch{}
+ updateAccountUi();
+}
+async function loadLeaderboard(){
+ if(!dbClient){accountUi.leaderboard.innerHTML='<li>Configure o Supabase para ativar o ranking.</li>';return}
+ const {data,error}=await dbClient.from('leaderboard').select('nickname,total_kills,wins,matches_played').order('wins',{ascending:false}).order('total_kills',{ascending:false}).limit(10);
+ if(error){accountUi.leaderboard.innerHTML='<li>Ranking indisponível. Execute o esquema Supabase.</li>';return}
+ accountUi.leaderboard.replaceChildren();
+ if(!data?.length){accountUi.leaderboard.innerHTML='<li>Nenhuma partida registrada ainda.</li>';return}
+ for(const row of data){const item=document.createElement('li');item.textContent=`${row.nickname} · ${row.wins} vitórias · ${row.total_kills} eliminações`;accountUi.leaderboard.append(item)}
+}
+async function loadMatchHistory(){
+ if(!dbClient||!currentUser){accountUi.history.innerHTML='<li>Entre para ver seu histórico.</li>';return}
+ const {data,error}=await dbClient.from('match_players').select('kills,won,joined_at,matches(mode,created_at)').eq('user_id',currentUser.id).order('joined_at',{ascending:false}).limit(8);
+ if(error){accountUi.history.innerHTML='<li>Histórico indisponível.</li>';return}
+ accountUi.history.replaceChildren();
+ if(!data?.length){accountUi.history.innerHTML='<li>Nenhuma partida registrada.</li>';return}
+ for(const row of data){const item=document.createElement('li'),date=row.matches?.created_at?new Date(row.matches.created_at).toLocaleDateString('pt-BR'):'';item.textContent=`${row.matches?.mode==='campaign'?'Campanha':'Arena'} · ${row.kills} eliminações · ${row.won?'vitória':'derrota'}${date?' · '+date:''}`;accountUi.history.append(item)}
+}
+async function signUp(){
+ if(!dbClient){statusAccount('Configure URL e chave publicável em supabase-config.js.');return}
+ const nickname=accountUi.nickname.value.trim(),email=accountUi.email.value.trim(),password=accountUi.password.value;
+ if(nickname.length<2||!email||password.length<6){statusAccount('Informe apelido, e-mail e senha com pelo menos 6 caracteres.');return}
+ const {data,error}=await dbClient.auth.signUp({email,password,options:{data:{nickname}}});
+ if(error){statusAccount(error.message);return}
+ if(data.session)statusAccount('Conta criada e conectada.');else statusAccount('Conta criada. Confirme seu e-mail para entrar.');
+}
+async function signIn(){
+ if(!dbClient){statusAccount('Configure URL e chave publicável em supabase-config.js.');return}
+ const {error}=await dbClient.auth.signInWithPassword({email:accountUi.email.value.trim(),password:accountUi.password.value});
+ if(error)statusAccount(error.message);
+}
+async function signOut(){if(dbClient){const {error}=await dbClient.auth.signOut();if(error)statusAccount(error.message)}}
+function initializeAccount(){
+ accountUi.nickname.value=profileNickname;
+ accountUi.signUp.addEventListener('click',signUp);accountUi.signIn.addEventListener('click',signIn);accountUi.signOut.addEventListener('click',signOut);
+ if(!dbClient){statusAccount('Banco desativado: configure supabase-config.js.');loadLeaderboard();return}
+ const applySession=session=>{
+   currentUser=session?.user||null;
+   updateAccountUi();
+  if(currentUser){loadProfile();loadLeaderboard();loadMatchHistory();loadCampaignProgress();if(net.matchId)saveMatchPlayerEntry();else if(net.isHost&&net.peer&&net.localId)createMatchRecord(net.localId,running?'playing':'waiting')}
+  else{loadLeaderboard();loadMatchHistory()}
+ };
+ dbClient.auth.onAuthStateChange((_event,session)=>{applySession(session)});
+ dbClient.auth.getSession().then(({data})=>applySession(data.session));
+}
+async function loadCampaignProgress(){
+ if(!dbClient||!currentUser)return null;
+ const {data,error}=await dbClient.from('campaign_progress').select('stage,kills').eq('user_id',currentUser.id).maybeSingle();
+ if(error)return null;
+ const button=document.getElementById('campaignBtn');
+ if(data)button.textContent='CONTINUAR FASE '+String(data.stage).padStart(2,'0');
+ return data;
+}
+function saveCampaignProgress(stage,killsValue){
+ if(!dbClient||!currentUser)return;
+ clearTimeout(progressSaveTimer);
+ progressSaveTimer=setTimeout(async()=>{
+   const {error}=await dbClient.from('campaign_progress').upsert({user_id:currentUser.id,stage,kills:killsValue,updated_at:new Date().toISOString()},{onConflict:'user_id'});
+   if(error)console.error('Falha ao salvar campanha:',error.message);
+ },500);
+}
+async function createMatchRecord(roomCode,status='waiting',mode='arena'){
+ if(!dbClient||!currentUser)return null;
+ if(roomCode&&net.matchCode===roomCode&&net.matchId)return net.matchId;
+ if(net.matchCreating)return null;
+ net.matchCreating=true;
+ try{
+  const {data,error}=await dbClient.from('matches').insert({room_code:roomCode,mode,status,created_by:currentUser.id}).select('id').single();
+   if(error){statusNet('Partida online; histórico indisponível: '+error.message);return null}
+   net.matchId=data.id;net.matchCode=roomCode;net.resultSaved=false;
+   await saveMatchPlayerEntry();
+  if(roomCode){sendNet({type:'match',matchId:data.id});if(running&&gameMode==='arena')await setMatchStatus('playing')}
+   return data.id;
+ }finally{net.matchCreating=false}
+}
+async function saveMatchPlayerEntry(){
+ if(!dbClient||!currentUser||!net.matchId)return;
+ const {error}=await dbClient.from('match_players').upsert({match_id:net.matchId,user_id:currentUser.id,nickname:profileNickname||fallbackNickname(currentUser),kills:kills||0,won:false},{onConflict:'match_id,user_id'});
+ if(error)statusNet('Sala conectada; não foi possível registrar o jogador no banco.');
+}
+async function setMatchStatus(status){
+ if(!dbClient||!currentUser||!net.isHost||!net.matchId)return;
+ const values={status};if(status==='finished')values.finished_at=new Date().toISOString();
+ const {error}=await dbClient.from('matches').update(values).eq('id',net.matchId);
+ if(error)console.error('Falha ao atualizar partida:',error.message);
+}
+async function saveMatchResult(won){
+ if(!dbClient||!currentUser||!net.matchId||net.resultSaved)return;
+ net.resultSaved=true;
+ const {error}=await dbClient.from('match_players').upsert({match_id:net.matchId,user_id:currentUser.id,nickname:profileNickname||fallbackNickname(currentUser),kills:kills||0,won},{onConflict:'match_id,user_id'});
+ if(error){net.resultSaved=false;statusNet('Não foi possível salvar o resultado da partida.');return}
+ if(net.isHost)await setMatchStatus('finished');
+ loadLeaderboard();loadMatchHistory();
+}
 function statusNet(s){netStatus.textContent=s}
+function hasConnectedPeers(){return gameMode==='arena'&&Boolean(net.conn?.open||net.connections.some(connection=>connection.open))}
 function sendNet(data){
  const packet={...data,from:net.localId};
  if(net.conn&&net.conn.open)net.conn.send(packet);
@@ -140,37 +276,60 @@ function sendNet(data){
 }
 function receiveNet(data){
  if(!data||data.from===net.localId)return;
- if(data.type==='state')net.remote[data.from]={x:data.x,y:data.y,angle:data.angle,hp:data.hp,at:Date.now()};
- if(data.type==='shot')bullets.push({x:data.x,y:data.y,vx:Math.cos(data.angle)*620,vy:Math.sin(data.angle)*620,life:.7,team:'remote',damage:0});
- if(data.type==='airstrike')planes.push({x:-90,y:data.y,vx:390,vy:35,targetX:data.x,targetY:data.ty,drop:.2,drops:8});
+ if(data.type==='hello')net.remote[data.from]={x:W/2,y:H/2,angle:0,hp:100,nickname:data.nickname||'Soldado',at:Date.now()};
+ if(data.type==='state'){
+   net.remote[data.from]={x:data.x,y:data.y,angle:data.angle,hp:data.hp,nickname:data.nickname||'Soldado',at:Date.now()};
+  if(data.host&&!net.isHost&&hasConnectedPeers()&&Array.isArray(data.bots)){
+     bots=data.bots.map(bot=>({...bot,r:13,speed:bot.speed||55,shoot:bot.shoot||1,flash:0}));
+     kills=data.kills||0;updateUI();
+   }
+ }
+ if(data.type==='shot'&&hasConnectedPeers()){
+   if(net.isHost){bullets.push({x:data.x,y:data.y,vx:Math.cos(data.angle)*620,vy:Math.sin(data.angle)*620,life:1.1,team:'blue',damage:1});sendNet({type:'shotFx',x:data.x,y:data.y,angle:data.angle,origin:data.from})}
+   else bullets.push({x:data.x,y:data.y,vx:Math.cos(data.angle)*620,vy:Math.sin(data.angle)*620,life:.7,team:'remote',damage:0});
+ }
+ if(data.type==='shotFx'&&hasConnectedPeers()&&data.origin!==net.localId)bullets.push({x:data.x,y:data.y,vx:Math.cos(data.angle)*620,vy:Math.sin(data.angle)*620,life:.7,team:'remote',damage:0});
+ if(data.type==='enemyShot'&&hasConnectedPeers())bullets.push({x:data.x,y:data.y,vx:Math.cos(data.angle)*300,vy:Math.sin(data.angle)*300,life:1.7,team:'red',damage:8});
+ if(data.type==='airstrike'&&hasConnectedPeers())planes.push({x:-90,y:data.y,vx:390,vy:35,targetX:data.x,targetY:data.ty,drop:.2,drops:8});
+ if(data.type==='match'){net.matchId=data.matchId;net.resultSaved=false;saveMatchPlayerEntry()}
+ if(data.type==='start'&&!net.isHost){net.matchId=data.matchId||net.matchId;start('arena',true)}
+ if(data.type==='matchEnd'&&hasConnectedPeers()&&!net.isHost&&!gameOver){gameOver=true;if(data.won)showVictory();else showEnd(false)}
+ if(data.type==='hello'&&net.isHost&&net.matchId)sendNet({type:'match',matchId:net.matchId});
 }
 function setupConnection(c){
- c.on('open',()=>{statusNet('Conectado! Os jogadores já podem entrar na arena.');c.send({type:'hello',from:net.localId});});
+ c.on('open',()=>{statusNet('Conectado! O líder pode iniciar a partida.');c.send({type:'hello',from:net.localId,nickname:profileNickname||'Soldado'});if(net.matchId)c.send({type:'match',matchId:net.matchId});if(net.isHost&&running&&gameMode==='arena'){c.send({type:'start',from:net.localId,matchId:net.matchId});setMatchStatus('playing')}});
  c.on('data',receiveNet);
- c.on('close',()=>statusNet('A conexão com o outro jogador foi encerrada.'));
+ c.on('close',()=>{delete net.remote[c.peer];statusNet('A conexão com o outro jogador foi encerrada.')});
  c.on('error',()=>statusNet('Falha na conexão. Confira o código e tente novamente.'));
 }
-function createRoom(){
+function createRoom(attempt=0){
  if(!window.Peer){statusNet('A conexão online não carregou. Confira a internet e recarregue a página.');return;}
- statusNet('Criando sala online…');roomShare.style.display='none';
+ if(attempt===0){statusNet('Criando sala online…');roomShare.style.display='none';}
  try{
-  net.peer=new Peer();
-  net.peer.on('open',id=>{
+  if(attempt===0){net.isHost=true;net.matchId=null;net.matchCode=null;net.resultSaved=false;}
+  const roomCode=String(Math.floor(10000000+Math.random()*90000000));
+  const peer=new Peer(roomCode);net.peer=peer;
+  peer.on('open',id=>{
    net.localId=id;
    roomShare.style.display='block';
-   roomShare.textContent='CÓDIGO DA SALA: '+id+' — envie este código ao amigo.';
+   roomShare.textContent='CÓDIGO DA SALA: '+roomCode+' — envie este código ao amigo.';
    statusNet('Sala criada! Aguarde seu amigo conectar.');
+    createMatchRecord(roomCode,running?'playing':'waiting');
   });
-  net.peer.on('connection',c=>{net.connections.push(c);setupConnection(c);});
-  net.peer.on('error',e=>statusNet('Erro de conexão: '+(e.type||'tente novamente')+'.'));
+  peer.on('connection',c=>{net.connections.push(c);setupConnection(c);});
+  peer.on('error',e=>{
+    if(e.type==='unavailable-id'&&attempt<5){peer.destroy();createRoom(attempt+1);return;}
+    statusNet('Erro de conexão: '+(e.type||'tente novamente')+'.');
+  });
  }catch(e){statusNet('Não foi possível criar a sala.')}
 }
 function joinRoom(){
  const id=document.getElementById('roomCode').value.trim();
- if(!id){statusNet('Digite o código da sala do seu amigo.');return}
+ if(!/^\d{8}$/.test(id)){statusNet('Digite o código numérico de 8 dígitos.');return}
  if(!window.Peer){statusNet('A conexão online não carregou. Confira a internet e recarregue a página.');return;}
  statusNet('Conectando à sala…');
  try{
+  net.isHost=false;net.matchId=null;net.matchCode=null;net.resultSaved=false;
   net.peer=new Peer();
   net.peer.on('open',myId=>{net.localId=myId;net.conn=net.peer.connect(id,{reliable:true});setupConnection(net.conn);});
   net.peer.on('error',e=>statusNet('Não foi possível conectar: '+(e.type||'verifique o código')+'.'));
@@ -195,6 +354,7 @@ function spawnAirRaid(){
  const targetX = 200 + Math.random()*(W-400);
  const targetY = 140 + Math.random()*(H-280);
  planes.push({x,y,vx:360+Math.random()*90,vy:18+Math.random()*14,targetX,targetY,drop:0.22,drops:9});
+ if(hasConnectedPeers()&&net.isHost)sendNet({type:'airstrike',x:targetX,y,ty:targetY});
 }
 function reset(){
  player={x:700,y:760,r:14,angle:-Math.PI/2,hp:100,inv:0};
@@ -220,7 +380,7 @@ function burst(x,y,color,n=7){for(let i=0;i<n;i++){let a=Math.random()*Math.PI*2
 function tryShoot(){
  if(!running||gameOver||reloadTimer>0||ammo<=0||player.cool>0)return false;
  shoot(player.x,player.y,player.angle,'blue');
- sendNet({type:'shot',x:player.x,y:player.y,angle:player.angle});
+ if(hasConnectedPeers())sendNet({type:'shot',x:player.x,y:player.y,angle:player.angle});
  ammo--;
  player.cool=.16;
  burst(player.x+Math.cos(player.angle)*19,player.y+Math.sin(player.angle)*19,'#ffd27a',2);
@@ -236,8 +396,15 @@ function update(dt){
  player.angle=Math.atan2(mouse.y-player.y,mouse.x-player.x);
  if(mouse.down)tryShoot();
  player.cool=Math.max(0,(player.cool||0)-dt);
+ const now=Date.now();
+ if(hasConnectedPeers()&&now-net.lastSend>80){
+   const state={type:'state',x:player.x,y:player.y,angle:player.angle,hp:player.hp,nickname:profileNickname||'Soldado',host:net.isHost};
+   if(net.isHost){state.bots=bots.map(bot=>({x:bot.x,y:bot.y,hp:bot.hp,angle:bot.angle,speed:bot.speed,shoot:bot.shoot}));state.kills=kills;}
+   sendNet(state);net.lastSend=now;
+ }
+ for(const [id,remote] of Object.entries(net.remote))if(now-remote.at>5000)delete net.remote[id];
  raidTimer-=dt;
- if(raidTimer<=0){spawnAirRaid();raidTimer=7+Math.random()*8;}
+ if(raidTimer<=0){if(!hasConnectedPeers()||net.isHost)spawnAirRaid();raidTimer=7+Math.random()*8;}
  // Habilidade aérea: a barra carrega com o tempo; aperta E quando estiver cheia.
  airCharge=Math.min(100,airCharge+dt*4.5);
  airstrikeFlash=Math.max(0,airstrikeFlash-dt);
@@ -255,7 +422,7 @@ function update(dt){
    if(bm.life<=0||Math.hypot(bm.x-bm.targetX,bm.y-bm.targetY)<12){
      burst(bm.targetX,bm.targetY,'#ffb347',22);burst(bm.targetX,bm.targetY,'#d8d1b8',16);
      // Explosão danifica bots próximos e pode atingir o jogador.
-     for(let j=bots.length-1;j>=0;j--){const b=bots[j];if(Math.hypot(b.x-bm.targetX,b.y-bm.targetY)<78){bots.splice(j,1);kills++;spawnTimer=.7;if(gameMode==='campaign'&&kills>=campaignTarget)advanceCampaign();}}
+    if(!hasConnectedPeers()||net.isHost)for(let j=bots.length-1;j>=0;j--){const b=bots[j];if(Math.hypot(b.x-bm.targetX,b.y-bm.targetY)<78){bots.splice(j,1);kills++;spawnTimer=.7;if(gameMode==='campaign')saveCampaignProgress(campaignStage,kills);if(gameMode==='campaign'&&kills>=campaignTarget)advanceCampaign();if(net.isHost&&hasConnectedPeers()&&kills>=MATCH_TARGET){gameOver=true;showVictory();}}}
      if(Math.hypot(player.x-bm.targetX,player.y-bm.targetY)<62&&player.inv<=0){player.hp-=22;player.inv=.5;if(player.hp<=0){player.hp=0;gameOver=true;showEnd()}}
      airstrikeFlash=.22;bombs.splice(i,1);updateUI();
    }
@@ -263,10 +430,10 @@ function update(dt){
  // Tecla E chama apoio aéreo quando a barra chega a 100%.
  if(keys.e&&airCharge>=100&&!gameOver){
    airCharge=0;const tx=player.x+(Math.random()-.5)*250,ty=player.y+(Math.random()-.5)*180;
-   planes.push({x:-90,y:45+Math.random()*110,vx:390,vy:35,targetX:tx,targetY:ty,drop:.2,drops:8});sendNet({type:'airstrike',x:tx,y:45+Math.random()*110,ty:ty});
+  planes.push({x:-90,y:45+Math.random()*110,vx:390,vy:35,targetX:tx,targetY:ty,drop:.2,drops:8});if(hasConnectedPeers())sendNet({type:'airstrike',x:tx,y:45+Math.random()*110,ty:ty});
    keys.e=false;
  }
- for(const b of bots){
+ if(!hasConnectedPeers()||net.isHost)for(const b of bots){
    b.flash=Math.max(0,b.flash-dt);
    const dist=Math.hypot(player.x-b.x,player.y-b.y),ang=Math.atan2(player.y-b.y,player.x-b.x);b.angle=ang;
    let vx=0,vy=0;
@@ -274,13 +441,13 @@ function update(dt){
    else if(dist<125){vx=-Math.cos(ang)*b.speed*.65*dt;vy=-Math.sin(ang)*b.speed*.65*dt}
    moveEntity(b,vx,vy);
    b.shoot-=dt;
-   if(b.shoot<=0&&dist<460){shoot(b.x,b.y,ang,'red');b.shoot=1.1+Math.random()*1.1}
+   if(b.shoot<=0&&dist<460){shoot(b.x,b.y,ang,'red');if(hasConnectedPeers()&&net.isHost)sendNet({type:'enemyShot',x:b.x,y:b.y,angle:ang});b.shoot=1.1+Math.random()*1.1}
  }
  for(let i=bullets.length-1;i>=0;i--){
    const q=bullets[i];q.x+=q.vx*dt;q.y+=q.vy*dt;q.life-=dt;
    let hit=q.life<=0||q.x<0||q.x>W||q.y<0||q.y>H||walls.some(a=>q.x>a.x&&q.x<a.x+a.w&&q.y>a.y&&q.y<a.y+a.h);
-   if(!hit&&q.team==='blue'){
-     for(let j=bots.length-1;j>=0;j--){let b=bots[j];if(Math.hypot(q.x-b.x,q.y-b.y)<b.r+3){b.hp--;b.flash=.1;burst(q.x,q.y,'#ff626c',4);hit=true;if(b.hp<=0){burst(b.x,b.y,'#ff4c5e',12);bots.splice(j,1);kills++;spawnTimer=1.1;updateUI();if(gameMode==='campaign'&&kills>=campaignTarget){advanceCampaign()}}break}}
+  if(!hit&&q.team==='blue'&&(!hasConnectedPeers()||net.isHost)){
+    for(let j=bots.length-1;j>=0;j--){let b=bots[j];if(Math.hypot(q.x-b.x,q.y-b.y)<b.r+3){b.hp--;b.flash=.1;burst(q.x,q.y,'#ff626c',4);hit=true;if(b.hp<=0){burst(b.x,b.y,'#ff4c5e',12);bots.splice(j,1);kills++;spawnTimer=1.1;updateUI();if(gameMode==='campaign')saveCampaignProgress(campaignStage,kills);if(gameMode==='campaign'&&kills>=campaignTarget){advanceCampaign()}if(net.isHost&&hasConnectedPeers()&&kills>=MATCH_TARGET){gameOver=true;showVictory()}}break}}
    }else if(!hit&&q.team==='red'&&Math.hypot(q.x-player.x,q.y-player.y)<player.r+3){
      hit=true;if(player.inv<=0){player.hp-=q.damage;player.inv=.35;burst(player.x,player.y,'#ff626c',4);updateUI();if(player.hp<=0){player.hp=0;gameOver=true;showEnd()}}
    }
@@ -371,6 +538,7 @@ function draw(){
  ctx.strokeStyle='#343a2c';ctx.lineWidth=12;ctx.strokeRect(20,20,W-40,H-40);
  ctx.strokeStyle='#a39363';ctx.lineWidth=2;ctx.strokeRect(26,26,W-52,H-52);
  if(gameMode==='campaign'){ctx.fillStyle='#f2d08b';ctx.font='bold 14px Arial';ctx.fillText('FASE '+campaignStage+'/6 • '+(campaignStages[campaignStage-1]?.name||'OPERAÇÃO FINAL')+' • '+kills+'/'+campaignTarget,340,48);}
+ else if(hasConnectedPeers()){ctx.fillStyle='#d8f2ff';ctx.font='bold 14px Arial';ctx.fillText('COOP • META '+kills+'/'+MATCH_TARGET,340,48);}
  // cover and walls
  for(const a of walls){
    ctx.fillStyle='#302d24';ctx.fillRect(a.x+4,a.y+5,a.w,a.h);
@@ -425,10 +593,13 @@ function draw(){
  }
  if(airstrikeFlash>0){ctx.fillStyle=`rgba(255,170,65,${airstrikeFlash*1.5})`;ctx.fillRect(0,0,W,H)}
  // bullets and particles
- for(const q of bullets){ctx.fillStyle=q.team==='blue'?'#7cddff':'#ff6b72';ctx.beginPath();ctx.arc(q.x,q.y,4,0,Math.PI*2);ctx.fill()}
+ for(const q of bullets){ctx.fillStyle=q.team==='blue'||q.team==='remote'?'#7cddff':'#ff6b72';ctx.beginPath();ctx.arc(q.x,q.y,4,0,Math.PI*2);ctx.fill()}
  for(const p of particles){ctx.globalAlpha=Math.max(0,p.life*2);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,4,4);ctx.globalAlpha=1}
  // bots
  for(const b of bots)drawCharacter(b,'red');
+ if(hasConnectedPeers())for(const remote of Object.values(net.remote))if(Date.now()-remote.at<2500){
+   drawCharacter(remote,'blue',true);ctx.fillStyle='#d8f2ff';ctx.font='bold 11px Arial';ctx.textAlign='center';ctx.fillText(remote.nickname||'ALIADO',remote.x,remote.y-37);ctx.textAlign='left';
+ }
  drawCharacter(player,'blue',true);
  // minimap
  ctx.fillStyle='#08111ddc';ctx.fillRect(W-170,75,132,100);ctx.strokeStyle='#526d88';ctx.strokeRect(W-170,75,132,100);
@@ -508,12 +679,13 @@ function drawCharacter(e,team,isPlayer=false){
 }
 function advanceCampaign(){
  if(gameMode!=='campaign'||gameOver)return;
- if(campaignStage>=campaignStages.length){gameOver=true;showVictory();return;}
+ if(campaignStage>=campaignStages.length){gameOver=true;saveCampaignProgress(campaignStage,kills);showVictory();return;}
  campaignStage++;
  const stage=campaignStages[campaignStage-1];
  campaignTarget+=stage.target;
  // Reforços chegam entre fases; o jogador recupera parte da vida e munição.
  player.hp=Math.min(100,player.hp+25);ammo=MAG_SIZE;reserve=Math.min(MAX_RESERVE,reserve+60);bullets=[];bombs=[];planes=[];airCharge=100;
+ saveCampaignProgress(campaignStage,kills);
  loadStage(campaignStage-1);
  for(let i=0;i<Math.min(5+campaignStage,9);i++)spawnBot(true);
  burst(player.x,player.y,'#74caff',28);updateUI();
@@ -530,10 +702,17 @@ function showVictory(){
  overlay.querySelector('p').innerHTML='Objetivo cumprido: <b>'+campaignTarget+' eliminações</b>. O setor foi assegurado.';
  overlay.querySelectorAll('p')[1].textContent='Jogue novamente ou volte ao menu para escolher outro modo.';
  startBtn.textContent='REJOGAR CAMPANHA';
+ saveMatchResult(true);if(net.isHost&&hasConnectedPeers())sendNet({type:'matchEnd',won:true});
 }
-function showEnd(){overlay.style.display='flex';overlay.querySelector('.tag').textContent='MISSÃO ENCERRADA';overlay.querySelector('h1').innerHTML='FIM DE <em>JOGO</em>';overlay.querySelector('p').innerHTML=`Tu conseguiu <b>${kills}</b> eliminações. Bora tentar de novo?`;overlay.querySelectorAll('p')[1].textContent='Pressiona ENTER ou clica abaixo para reiniciar.';startBtn.textContent='JOGAR NOVAMENTE'}
-function start(mode='arena'){
+function showEnd(notifyNetwork=true){overlay.style.display='flex';overlay.querySelector('.tag').textContent='MISSÃO ENCERRADA';overlay.querySelector('h1').innerHTML='FIM DE <em>JOGO</em>';overlay.querySelector('p').innerHTML=`Tu conseguiu <b>${kills}</b> eliminações. Bora tentar de novo?`;overlay.querySelectorAll('p')[1].textContent='Pressiona ENTER ou clica abaixo para reiniciar.';startBtn.textContent='JOGAR NOVAMENTE';saveMatchResult(false);if(notifyNetwork&&net.isHost&&hasConnectedPeers())sendNet({type:'matchEnd',won:false})}
+function start(mode='arena',fromNetwork=false){
+ const online=hasConnectedPeers();
+ if(mode==='arena'&&online&&!net.isHost&&!fromNetwork){statusNet('Aguardando o líder iniciar a partida.');return}
+ if(mode==='arena'&&online&&net.isHost&&!fromNetwork){sendNet({type:'start',matchId:net.matchId});setMatchStatus('playing')}
  gameMode=mode;reset();
+ net.remote={};
+ if(mode==='arena'&&!online&&currentUser&&!net.peer){net.isHost=true;net.matchId=null;net.matchCode=null;net.resultSaved=false;createMatchRecord(null,'playing')}
+ if(mode==='campaign'&&currentUser){net.isHost=true;net.matchId=null;net.matchCode=null;net.resultSaved=false;createMatchRecord(null,'playing','campaign')}
  if(gameMode==='campaign'){
    for(let i=0;i<3;i++)spawnBot(true);
    overlay.querySelector('.tag').textContent='CAMPANHA // FASE 01 DE 06';
@@ -542,7 +721,18 @@ function start(mode='arena'){
  }
  running=true;overlay.style.display='none';last=performance.now();requestAnimationFrame(loop)
 }
-document.getElementById('campaignBtn').addEventListener('click',()=>start('campaign'));
+async function startCampaign(){
+ const progress=await loadCampaignProgress();
+ start('campaign');
+ if(progress){
+   campaignStage=progress.stage;kills=progress.kills;
+   campaignTarget=campaignStages.slice(0,campaignStage).reduce((total,stage)=>total+stage.target,0);
+   loadStage(campaignStage-1);bots=[];
+   for(let i=0;i<Math.min(5+campaignStage,9);i++)spawnBot(true);
+   updateUI();
+ }
+}
+document.getElementById('campaignBtn').addEventListener('click',startCampaign);
 function loop(t){if(!running)return;let dt=Math.min(.033,(t-last)/1000||0);last=t;update(dt);draw();requestAnimationFrame(loop)}
 window.addEventListener('keydown',e=>{const key=e.key.toLowerCase();keys[key]=true;if(key==='f'&&!e.repeat)openAmmoCrate();if(key==='r'&&reloadTimer<=0&&ammo<MAG_SIZE&&reserve>0){reloadTimer=1.1}if(e.key==='Enter'&&gameOver)start()});
 window.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
@@ -552,7 +742,7 @@ canvas.addEventListener('mousedown',e=>{if(e.button===0){mouse.down=true; trySho
 canvas.addEventListener('mouseup',e=>{if(e.button===0)mouse.down=false});
 window.addEventListener('mouseup',()=>mouse.down=false);
 startBtn.addEventListener('click',()=>{if(gameMode==='campaign'&&campaignStage>1&&!gameOver&&overlay.style.display==='flex'){overlay.style.display='none';running=true;last=performance.now();requestAnimationFrame(loop)}else start(gameMode)});
-reset();draw();
+initializeAccount();reset();draw();
 })();
 </script>
 </body>
