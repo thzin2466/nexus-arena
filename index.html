@@ -72,9 +72,65 @@ const overlay=document.getElementById('overlay'),startBtn=document.getElementByI
 const ui={kills:document.getElementById('kills'),health:document.getElementById('health'),ammo:document.getElementById('ammo')};
 const W=canvas.width,H=canvas.height;
 let keys={},mouse={x:W/2,y:H/2,down:false},player,bots,bullets,particles,kills,ammo,reserve,reloadTimer,gameOver,running,last=0,spawnTimer,airCharge,planes,bombs,airstrikeFlash;
-let gameMode='arena',campaignTarget=8,campaignStage=1,campaignStages=[{name:'PRAIA DE DESEMBARQUE',target:8,enemySpeed:1},{name:'TRINCHEIRAS DO OESTE',target:10,enemySpeed:1.08},{name:'VILA EM RUÍNAS',target:12,enemySpeed:1.16},{name:'FLORESTA SOMBRIA',target:14,enemySpeed:1.24},{name:'CONTRA-ATAQUE',target:16,enemySpeed:1.32},{name:'FORTALEZA FINAL',target:18,enemySpeed:1.42}];
+let gameMode='arena',campaignTarget=8,campaignStage=1;
+const campaignStages=[
+ {name:'NORMANDY BEACH',target:8,enemySpeed:1,theme:'beach',palette:{ground:'#151e22',grid:'#22313d',wall:'#6d6256',accent:'#d6b261',hud:'#8ae0ff'}},
+ {name:'TRINCHEIRAS DO OESTE',target:10,enemySpeed:1.08,theme:'trench',palette:{ground:'#1a1a1a',grid:'#292d2f',wall:'#5f564a',accent:'#d6b05d',hud:'#9be6ff'}},
+ {name:'VILA EM RUÍNAS',target:12,enemySpeed:1.16,theme:'ruins',palette:{ground:'#1d1b1a',grid:'#312a29',wall:'#6c5246',accent:'#d89056',hud:'#9be6ff'}},
+ {name:'FLORESTA SOMBRIA',target:14,enemySpeed:1.24,theme:'forest',palette:{ground:'#121b17',grid:'#1f322b',wall:'#456a4d',accent:'#d7c76d',hud:'#9be6ff'}},
+ {name:'CIDADE DE BERLIM',target:16,enemySpeed:1.32,theme:'city',palette:{ground:'#171c22',grid:'#25313d',wall:'#5f6975',accent:'#d4b96f',hud:'#9be6ff'}},
+ {name:'FORTALEZA FINAL',target:18,enemySpeed:1.42,theme:'fortress',palette:{ground:'#191910',grid:'#2b2d1f',wall:'#6b5f4c',accent:'#e0c469',hud:'#9be6ff'}}
+];
+const stageLayouts=[
+ [
+  {x:210,y:145,w:210,h:58},{x:210,y:203,w:58,h:154},{x:938,y:130,w:210,h:58},{x:1089,y:188,w:58,h:154},
+  {x:546,y:135,w:98,h:175},{x:728,y:532,w:105,h:175},{x:180,y:546,w:196,h:58},{x:980,y:546,w:203,h:58},
+  {x:546,y:378,w:105,h:67},{x:749,y:350,w:105,h:67},{x:105,y:350,w:98,h:98},{x:1190,y:343,w:98,h:98},
+  {x:405,y:635,w:180,h:55},{x:810,y:210,w:72,h:135},{x:895,y:665,w:160,h:55},{x:320,y:430,w:75,h:115}
+ ],
+ [
+  {x:155,y:170,w:200,h:48},{x:155,y:216,w:48,h:150},{x:1010,y:180,w:200,h:48},{x:1162,y:228,w:48,h:150},
+  {x:510,y:120,w:100,h:170},{x:770,y:560,w:120,h:150},{x:190,y:560,w:220,h:55},{x:1000,y:540,w:210,h:55},
+  {x:560,y:360,w:110,h:80},{x:725,y:355,w:110,h:80},{x:120,y:330,w:110,h:110},{x:1225,y:330,w:110,h:110},
+  {x:390,y:640,w:180,h:60},{x:840,y:215,w:75,h:150},{x:920,y:670,w:170,h:55},{x:300,y:430,w:90,h:120}
+ ],
+ [
+  {x:235,y:170,w:190,h:54},{x:235,y:224,w:54,h:160},{x:930,y:150,w:190,h:54},{x:1066,y:204,w:54,h:160},
+  {x:500,y:145,w:100,h:190},{x:740,y:515,w:120,h:170},{x:210,y:532,w:220,h:60},{x:980,y:535,w:220,h:60},
+  {x:550,y:405,w:105,h:75},{x:715,y:385,w:105,h:75},{x:100,y:370,w:110,h:95},{x:1185,y:355,w:110,h:95},
+  {x:430,y:630,w:200,h:60},{x:810,y:240,w:80,h:140},{x:900,y:640,w:180,h:55},{x:330,y:430,w:80,h:120}
+ ],
+ [
+  {x:180,y:150,w:190,h:58},{x:180,y:208,w:58,h:140},{x:950,y:150,w:190,h:58},{x:1080,y:208,w:58,h:140},
+  {x:530,y:130,w:100,h:180},{x:760,y:520,w:105,h:170},{x:170,y:560,w:220,h:60},{x:980,y:560,w:220,h:60},
+  {x:555,y:365,w:90,h:80},{x:735,y:350,w:90,h:80},{x:130,y:350,w:95,h:100},{x:1180,y:345,w:95,h:100},
+  {x:400,y:650,w:185,h:60},{x:810,y:210,w:80,h:140},{x:880,y:680,w:160,h:55},{x:330,y:440,w:85,h:110}
+ ],
+ [
+  {x:210,y:120,w:200,h:60},{x:210,y:180,w:60,h:160},{x:940,y:120,w:200,h:60},{x:1090,y:180,w:60,h:160},
+  {x:520,y:150,w:120,h:180},{x:760,y:520,w:120,h:170},{x:200,y:540,w:200,h:60},{x:990,y:540,w:200,h:60},
+  {x:560,y:360,w:110,h:80},{x:720,y:360,w:110,h:80},{x:120,y:340,w:110,h:100},{x:1185,y:340,w:110,h:100},
+  {x:400,y:640,w:190,h:60},{x:825,y:210,w:80,h:150},{x:905,y:670,w:160,h:55},{x:320,y:430,w:82,h:120}
+ ],
+ [
+  {x:200,y:140,w:210,h:58},{x:200,y:198,w:58,h:150},{x:960,y:140,w:210,h:58},{x:1112,y:198,w:58,h:150},
+  {x:540,y:120,w:95,h:170},{x:760,y:530,w:105,h:170},{x:190,y:540,w:210,h:60},{x:1000,y:540,w:210,h:60},
+  {x:560,y:360,w:110,h:80},{x:720,y:360,w:110,h:80},{x:120,y:335,w:105,h:105},{x:1185,y:335,w:105,h:105},
+  {x:405,y:630,w:190,h:60},{x:820,y:210,w:83,h:150},{x:900,y:670,w:170,h:55},{x:315,y:430,w:85,h:120}
+ ]
+];
+const ammoPointsByStage=[
+ [[190,300],[520,260],[910,260],[1180,700],[740,680],[700,110]],
+ [[220,430],[450,210],[955,230],[1220,460],[700,280],[1100,700]],
+ [[180,250],[540,520],[980,260],[1210,600],[700,180],[660,720]],
+ [[240,470],[520,260],[900,230],[1160,470],[700,470],[650,710]],
+ [[220,350],[510,210],[910,210],[1190,610],[740,650],[680,120]],
+ [[180,300],[540,250],[930,250],[1200,700],[760,260],[700,610]]
+];
 const net={peer:null,conn:null,connections:[],remote:{},lastSend:0,localId:null};
 const netStatus=document.getElementById('netStatus'),roomShare=document.getElementById('roomShare');
+const walls=[];
+let ammoCrates=[];
 function statusNet(s){netStatus.textContent=s}
 function sendNet(data){
  const packet={...data,from:net.localId};
@@ -122,16 +178,19 @@ function joinRoom(){
 document.getElementById('hostRoom').addEventListener('click',createRoom);
 document.getElementById('joinRoom').addEventListener('click',joinRoom);
 
-const walls=[
-{x:210,y:145,w:210,h:58},{x:210,y:203,w:58,h:154},{x:938,y:130,w:210,h:58},{x:1089,y:188,w:58,h:154},
-{x:546,y:135,w:98,h:175},{x:728,y:532,w:105,h:175},{x:180,y:546,w:196,h:58},{x:980,y:546,w:203,h:58},
-{x:546,y:378,w:105,h:67},{x:749,y:350,w:105,h:67},{x:105,y:350,w:98,h:98},{x:1190,y:343,w:98,h:98},
-{x:405,y:635,w:180,h:55},{x:810,y:210,w:72,h:135},{x:895,y:665,w:160,h:55},{x:320,y:430,w:75,h:115}
-];
+function loadStage(stageIndex=0){
+ const stage=campaignStages[stageIndex]||campaignStages[0];
+ walls.length=0;
+ for(const item of stageLayouts[stageIndex]||stageLayouts[0])walls.push({...item});
+ ammoCrates=[];
+ const points=ammoPointsByStage[stageIndex]||ammoPointsByStage[0];
+ for(const [x,y] of points)ammoCrates.push({x,y,r:10,amount:18});
+ player.x=700;player.y=760;player.angle=-Math.PI/2;
+}
 function reset(){
  player={x:700,y:760,r:14,angle:-Math.PI/2,hp:100,inv:0};
  bots=[];bullets=[];particles=[];kills=0;ammo=30;reserve=90;reloadTimer=0;gameOver=false;spawnTimer=0;airCharge=0;planes=[];bombs=[];airstrikeFlash=0;
- campaignStage=1;campaignTarget=campaignStages[0].target;for(let i=0;i<7;i++)spawnBot(true);updateUI();
+ campaignStage=1;campaignTarget=campaignStages[0].target;loadStage(0);for(let i=0;i<7;i++)spawnBot(true);updateUI();
 }
 function spawnBot(initial=false){
  let p,tries=0;
@@ -216,16 +275,28 @@ function update(dt){
    }
    if(hit)bullets.splice(i,1);
  }
+ for(let i=ammoCrates.length-1;i>=0;i--){
+   const crate=ammoCrates[i];
+   if(Math.hypot(player.x-crate.x,player.y-crate.y)<player.r+16){
+     let gain=crate.amount;
+     if(ammo<30){const refill=Math.min(30-ammo,gain);ammo+=refill;gain-=refill;}
+     reserve=Math.min(180,reserve+gain);
+     ammoCrates.splice(i,1);
+     burst(crate.x,crate.y,'#83d6ff',12);
+     updateUI();
+   }
+ }
  if(spawnTimer>0){spawnTimer-=dt;if(spawnTimer<=0&&bots.length<6)spawnBot()}
  for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;if(p.life<=0)particles.splice(i,1)}
  updateUI();
 }
 function updateUI(){ui.kills.textContent=kills;ui.health.textContent=Math.max(0,Math.ceil(player?.hp||100));ui.ammo.textContent=`${ammo} / ${reserve}`}
 function draw(){
+ const stage=campaignStages[Math.min(campaignStage-1, campaignStages.length-1)]||campaignStages[0];
  ctx.clearRect(0,0,W,H);
- ctx.fillStyle='#101b28';ctx.fillRect(0,0,W,H);
+ ctx.fillStyle=stage.palette.ground;ctx.fillRect(0,0,W,H);
  // floor grid
- ctx.strokeStyle='#1d2c3e';ctx.lineWidth=1;
+ ctx.strokeStyle=stage.palette.grid;ctx.lineWidth=1;
  for(let x=20;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,20);ctx.lineTo(x,H-20);ctx.stroke()}
  for(let y=20;y<H;y+=40){ctx.beginPath();ctx.moveTo(20,y);ctx.lineTo(W-20,y);ctx.stroke()}
  // Textura de terreno de guerra: terra batida, crateras, arame farpado e trincheiras.
@@ -254,10 +325,15 @@ function draw(){
  ctx.restore();
  // cover and walls
  for(const a of walls){
-   ctx.fillStyle='#26394e';ctx.fillRect(a.x,a.y,a.w,a.h);
+   ctx.fillStyle=stage.palette.wall;ctx.fillRect(a.x,a.y,a.w,a.h);
    ctx.fillStyle='#3a526c';ctx.fillRect(a.x,a.y,a.w,7);
    ctx.strokeStyle='#101a27';ctx.lineWidth=3;ctx.strokeRect(a.x,a.y,a.w,a.h);
-   ctx.fillStyle='#d9a63c';ctx.fillRect(a.x+8,a.y+a.h-7,Math.max(18,a.w*.32),4);
+   ctx.fillStyle=stage.palette.accent;ctx.fillRect(a.x+8,a.y+a.h-7,Math.max(18,a.w*.32),4);
+ }
+ for(const c of ammoCrates){
+   ctx.fillStyle='#d9f0ff';ctx.fillRect(c.x-10,c.y-10,20,20);
+   ctx.fillStyle='#3b9fe8';ctx.fillRect(c.x-8,c.y-8,16,16);
+   ctx.fillStyle='#dff3ff';ctx.fillText('M',c.x-4,c.y+4);
  }
  // crates
  for(const [x,y] of [[90,115],[1270,115],[320,700],[920,700],[650,155],[800,250],[470,580],[1120,470],[600,750],[1240,740]]){
@@ -365,6 +441,7 @@ function advanceCampaign(){
  campaignTarget+=stage.target;
  // Reforços chegam entre fases; o jogador recupera parte da vida e munição.
  player.hp=Math.min(100,player.hp+25);ammo=30;reserve=Math.min(180,reserve+45);bullets=[];bombs=[];planes=[];airCharge=100;
+ loadStage(campaignStage-1);
  for(let i=0;i<Math.min(5+campaignStage,9);i++)spawnBot(true);
  burst(player.x,player.y,'#74caff',28);updateUI();
  overlay.style.display='flex';overlay.querySelector('.tag').textContent='CAMPANHA // FASE 0'+campaignStage+' DE 06';
