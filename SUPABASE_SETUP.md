@@ -1,19 +1,13 @@
 # Configuração do Supabase
 
 1. Crie um projeto no Supabase.
-2. Abra o SQL Editor e execute o conteúdo de `supabase-schema.sql`.
-3. Em Project Settings > API, copie o Project URL e a chave publicável (anon) para `supabase-config.js`.
-4. Em Authentication > URL Configuration, configure a URL do GitHub Pages como Site URL e Redirect URL.
-5. Em Authentication > Providers, habilite Email. Se a confirmação de e-mail estiver ativa, confirme o cadastro antes de entrar.
-6. Publique os arquivos do repositório no GitHub Pages.
+2. No SQL Editor, execute o conteúdo de `supabase-schema.sql`.
+3. Em Project Settings > API, copie o Project URL e a chave publicável (`anon` ou `publishable`) para `supabase-config.js`.
+4. Publique os arquivos do projeto no GitHub Pages ou em outro host estático.
+5. No jogo, informe um apelido e crie uma sala. Compartilhe o código de 8 dígitos para que outra pessoa entre.
 
-Use somente a chave publicável no navegador. Nunca coloque `service_role` em `supabase-config.js` nem no GitHub.
+Não é necessário habilitar login ou criar usuários. As partidas usam canais públicos do Supabase Realtime para mensagens e presença; `guest_matches` guarda salas e `guest_match_players` guarda apelidos e resultados. O apelido e um identificador aleatório ficam salvos no navegador. O progresso da campanha permanece local neste dispositivo.
 
-## Dados guardados
+Use somente a chave publicável no navegador. Nunca coloque a chave `service_role` no projeto. Como o multiplayer aceita conexões anônimas, nomes, códigos e resultados não são protegidos contra falsificação; é adequado para partidas entre amigos, não para ranking competitivo. A simulação da partida também acontece nos navegadores dos jogadores.
 
-- `profiles`: apelido associado à conta autenticada.
-- `matches` e `match_players`: salas e resultados por jogador.
-- `campaign_progress`: fase e eliminações da campanha.
-- `leaderboard`: visão agregada de partidas, eliminações e vitórias.
-
-Sem URL e chave configuradas, o jogo continua disponível offline; login, ranking e persistência online ficam desativados. As partidas ao vivo usam PeerJS. Como a simulação e o envio de resultados acontecem no navegador, esse ranking é adequado para amigos/demonstração, não para competição com proteção contra trapaças. Para isso seria necessário um servidor de jogo autoritativo.
+As tabelas antigas de conta (`profiles`, `matches`, `match_players` e `campaign_progress`) foram mantidas no SQL para preservar instalações existentes, mas o jogo não as utiliza no fluxo sem login.
